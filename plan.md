@@ -5,11 +5,27 @@
 
 # TABLE OF CONTENTS
 
-1.  Game Overview            6.  Staff System             11. Board Decisions (65)
-2.  Visual Design System     7.  Executive System         12. Events & News System
-3.  Industry System (15)     8.  Research & Development   13. Investor Contracts
-4.  Country Database (55)    9.  Brand Reputation         14. Seasonal & Prestige
-5.  Branch System            10. Stock Market System      15-21. See continued doc
+1.  Game Overview
+2.  Visual Design System
+3.  Industry System (15)
+4.  Country Database (55)
+5.  Branch System
+6.  Staff System
+7.  Executive System
+8.  Research & Development
+9.  Brand Reputation
+10. Stock Market System
+11. Board Decisions (65)
+12. Events & News System
+13. Investor Contracts
+14. Seasonal & Prestige
+15. Social features
+16. Unique features
+17. UI screen layouts
+18. Monetization
+19. Technical architecture
+20. All player choises - Master list
+21. Implementation notes
 
 ---
 
