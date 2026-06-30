@@ -3091,6 +3091,12 @@ local GameConfig = {
 ```
 PHASE 1 — MVP (4-6 weeks):
   - ProfileStore setup (correct from day one — no shortcuts)
+  - GameRegistry + Config architecture built FIRST, not retrofitted later.
+    BranchService, EventService, IncomeService, StaffService all read content
+    through GameRegistry/IndustryConfig/CountryConfig from the start — even
+    though only 2 industries and 3 countries exist in the configs yet.
+    This costs almost nothing now and avoids a painful refactor in Phase 2
+    when content scales 8x.
   - Income tick system + client sync (every 5s)
   - Branch system (open, level, path selection, income formula)
   - Staff system (hire, morale decay, fire, quit logic)
@@ -3099,38 +3105,71 @@ PHASE 1 — MVP (4-6 weeks):
   - Login Summary Screen (OverlayManager)
   - Basic Dashboard tab + Branches tab + Staff tab
   - Top bar + Bottom nav
-  - MonetizationL Revenue Boost + CEO Pass only
+  - Monetization: Revenue Boost + CEO Pass only
   → Soft launch as alpha, collect feedback
 
-PHASE 2 — v1.0 (4-6 more weeks):
-  - All 15 industries
-  - All Tier 1-3 countries (13 countries)
-  - Executive system (all 4 roles)
-  - R&D system (all 25 projects)
-  - Brand reputation system
-  - Board decisions (30 types minimum)
-  - Crisis + events system (all crisis types)
-  - Investor contracts
-  - Full UI (all 8 tabs)
-  - All monetization items
-  → Official release
+PHASE 2a — CORE SYSTEMS, LIMITED CONTENT (3-4 weeks):
+  Goal: get every major system live and load-bearing on a small, hand-tuned
+  content set BEFORE writing out the full 65/45/25 lists. Validates the
+  income formula (Section 19) — quality x path x city x country x brand x
+  exec x R&D x staff — while it's still cheap to rebalance.
+  - Executive system (all 4 roles, all 3 tiers — this is a system, not content)
+  - ~15 R&D projects covering each category (income, staff, brand, defense)
+  - ~25 board decisions covering all 6 categories at least 3-4 times each
+  - Core crisis pool: 5 universal crises + 10 crisis types across the 2
+    launched industries (not all 45 yet)
+  - Investor contracts (all 25 — this is config-only content, cheap to ship in full)
+  - Brand reputation system fully live
+  - 5 more countries (8 total, still Tier 1-2 only)
+  - Remaining Tier 1-2 industries (Tech, Fashion — pick 2 more, not all 15)
+  → Closed beta. Watch income curve, crisis frequency, board decision balance
+    before locking numbers in BalanceConfig.
 
-PHASE 3 — v1.5 (ongoing):
-  - Stock market
+PHASE 2b — FULL CONTENT FILL (3-4 weeks):
+  Goal: now that the formula and pacing are validated against real player
+  data, fill out content. Because everything is config-driven (Section 22),
+  this phase is mechanical — copy-paste-edit blocks, not new design work.
+  - Remaining 9 industries
+  - Remaining Tier 1-3 countries (13 countries total)
+  - Remaining R&D projects (25 total)
+  - Remaining board decisions (65 total)
+  - Remaining crisis types (45 total)
+  - Opportunity events (all 20)
+  - Full UI polish across all 8 tabs
+  - Remaining monetization items EXCEPT Season Pass tiers that depend on
+    IPO (see Phase 3 note below) — Expansion License, Extra R&D Slot,
+    VIP Dossier, Starter Bundle, Quick Renovation, Branch Slot Unlock
+    can all ship here since none of them require a season timer.
+  → Official release.
+
+PHASE 3 — SEASONAL LAYER + PVP (4-6 weeks):
+  Note: Season Pass (tiers tied to IPO/legacy multiplier) and the CEO Pass's
+  offline-cap synergy with CFO are only fully meaningful once IPO exists.
+  If Season Pass was sold in Phase 2b, treat tiers 12, 19 as "banked, paid
+  out at first IPO" rather than holding the whole pass back — but the
+  season timer itself belongs here.
+  - Seasonal system (season timer, IPO, legacy multiplier, badges)
+  - Season Pass reward track fully wired to season XP
+  - Stock market (indexes, crashes, trading, listing/delisting)
   - Hostile takeovers + PvP
   - Corporation Mode
   - Player branch marketplace
-  - Seasonal system (IPO + prestige)
-  - Tier 4+ countries
-  - Season Pass system
+  - Tier 4-6 countries (remaining 33 countries)
+  - Space & Aerospace industry (gated behind first IPO per Section 3)
+  → This is the heaviest phase — consider splitting further into 3a
+    (seasonal/IPO + remaining countries) and 3b (stock market + PvP +
+    Corp mode) if testing surfaces problems with either half in isolation.
 
-PHASE 4 — Live Service:
+PHASE 4 — LIVE SERVICE (ongoing):
   - Monthly seasons with new Season Pass ID
   - Seasonal events calendar (Section 12)
-  - New R&D projects
-  - New board decisions
+  - New R&D projects, board decisions, crisis types (config-only additions,
+    see Section 22.20 — no service code changes needed for any of this)
   - Leaderboard badges
   - Community events
+  - Admin-driven live events (Section 22.18-22.20): seasonal triggers,
+    temporary income multipliers, broadcast announcements — all without
+    a restart or redeploy
 ```
 
 ## Critical "Don't Make These Mistakes" Notes
