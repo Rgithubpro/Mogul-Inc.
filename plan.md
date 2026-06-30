@@ -26,6 +26,7 @@
 19. Technical architecture
 20. All player choises - Master list
 21. Implementation notes
+22. DATA ARCHITECTURE, CONFIG SYSTEM & ADMIN
 
 ---
 
@@ -3182,9 +3183,3898 @@ PHASE 4 — Live Service:
 
 ---
 
+# SECTION 22: DATA ARCHITECTURE, CONFIG SYSTEM & ADMIN
+
+## 22.1 The Core Principle
+
+Every piece of game content lives as a plain data table in a ModuleScript. Services contain zero hardcoded content — only logic. This means:
+
+- Adding a new industry = add one table entry to IndustryConfig. No service code touched.
+- Adding a new country = add one table entry to CountryConfig. No service code touched.
+- Rebalancing income = change one number in BalanceConfig. No service code touched.
+- Running a live event = one AdminService command. No restart needed.
+
+```
+CONTENT (what exists)  →  Config ModuleScripts    ← you edit these
+LOGIC   (how it works) →  Service Scripts         ← never touch to add content
+```
+
+---
+
+## 22.2 Complete Folder Structure
+
+```
+ReplicatedStorage/
+  Config/                        ← CLIENT + SERVER can read
+    IndustryConfig  (ModuleScript)
+    CountryConfig   (ModuleScript)
+    CityConfig      (ModuleScript)
+    StaffConfig     (ModuleScript)
+    ExecConfig      (ModuleScript)
+    ResearchConfig  (ModuleScript)
+    MilestoneConfig (ModuleScript)
+    IconConfig      (ModuleScript)
+  DefaultProfile    (ModuleScript)
+  Remotes/
+    Events/         (all RemoteEvent instances)
+    Functions/      (all RemoteFunction instances)
+
+ServerScriptService/
+  ServerConfig/                  ← SERVER ONLY
+    BoardConfig       (ModuleScript)
+    CrisisConfig      (ModuleScript)
+    OpportunityConfig (ModuleScript)
+    SeasonalConfig    (ModuleScript)
+    ContractConfig    (ModuleScript)
+    BalanceConfig     (ModuleScript)
+    AdminConfig       (ModuleScript)
+  GameRegistry        (ModuleScript)
+  Services/
+    AdminService      (Script)
+    PlayerService     (Script)
+    IncomeService     (Script)
+    BranchService     (Script)
+    StaffService      (Script)
+    ExecService       (Script)
+    ResearchService   (Script)
+    BrandService      (Script)
+    StockService      (Script)
+    BoardService      (Script)
+    EventService      (Script)
+    ContractService   (Script)
+    SeasonService     (Script)
+    TakeoverService   (Script)
+    CorpService       (Script)
+    MarketplaceHandler (Script)
+    MilestoneTracker   (Script)
+    RateLimiter        (ModuleScript)
+```
+
+---
+
+## 22.3 Config File: IndustryConfig
+
+```
+Path: ReplicatedStorage/Config/IndustryConfig
+To add a new industry: add one new key block to the return table. That is all.
+```
+
+```lua
+-- ReplicatedStorage/Config/IndustryConfig.lua
+--
+-- FIELD REFERENCE:
+--   displayName    string   shown in UI and news ticker
+--   themeColor     Color3   UI accent color for this industry
+--   iconKey        string   key in IconConfig to find the asset ID
+--   branchName     string   what a "branch" is called (Restaurant / Clinic / etc.)
+--   staffTitle     string   what staff are called (Team Member / Engineer / etc.)
+--   productName    string   what is sold (Menu Item / Software Suite / etc.)
+--   hqName         string   name of the player\'s headquarters
+--   validSlots     table    which city slot types accept this industry\'s branches
+--   upgradeNames   table    5 display names per upgrade path (volume/premium/seasonal)
+--   crisisPool     table    exactly 10 crisis IDs from CrisisConfig
+--   exclusiveRD    table    up to 4 R&D project IDs from ResearchConfig (industry-only)
+--   mechanics      table    numeric overrides — copy fast_food if nothing special
+
+return {
+
+    -- ================================================================
+    fast_food = {
+        displayName = "Fast Food",
+        themeColor  = Color3.fromHex("#F97316"),
+        iconKey     = "Industry.FastFood",
+        branchName  = "Restaurant",
+        staffTitle  = "Team Member",
+        productName = "Menu Item",
+        hqName      = "Corporate Kitchen",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Combo Deals","Express Line","Drive-Through","Kiosk Stations","Meal Bundles"},
+            premium  = {"Gourmet Menu","Table Service","Chef Partnership","Premium Ingredients","VIP Dining"},
+            seasonal = {"Holiday Special","Summer Sale","Festive Meal Box","Limited Burger","Anniversary Deal"},
+        },
+        crisisPool = {
+            "health_inspection_failure","supply_chain_shortage","food_contamination_scare",
+            "staff_walkout","competitor_price_war","delivery_delay","equipment_breakdown",
+            "bad_review_viral","ingredient_price_spike","health_department_audit",
+        },
+        exclusiveRD = {"recipe_innovation","drive_through_ai","nutrition_partnership","franchise_training_kit"},
+        mechanics = {
+            offlineCapBase     = 8*3600,  -- base offline earnings cap in seconds
+            qualityDecayMult   = 1.0,     -- multiplier on base quality decay rate
+            seasonalEventMult  = 3.0,     -- Seasonal path event income multiplier
+            crisisIgnoreChance = 0.50,    -- secondary crisis chance when ignoring (0-1)
+            rdBonusMult        = 1.0,     -- R&D bonus strength multiplier
+            perRdIncomeBonus   = 0,       -- permanent income % per completed R&D (socialmedia=0.05)
+            membershipFloor    = 0,       -- income floor fraction (fitness=0.60)
+            baseOfflineBonus   = 0,       -- inherent offline bonus before CFO (realestate=0.30)
+            branchCostMult     = 1.0,     -- multiplier on base branch opening cost
+            branchIncomeMult   = 1.0,     -- multiplier on base branch income
+            unlockRequiresIPO  = false,   -- true = locked until player has completed 1 IPO
+            brandGainMult      = 1.0,     -- brand score gain rate multiplier
+        },
+    },
+
+    -- ================================================================
+    tech = {
+        displayName = "Tech",
+        themeColor  = Color3.fromHex("#6366F1"),
+        iconKey     = "Industry.Tech",
+        branchName  = "Office",
+        staffTitle  = "Engineer",
+        productName = "Software Suite",
+        hqName      = "Innovation Campus",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort","tech_campus"},
+        upgradeNames = {
+            volume   = {"Open Workspace","Agile Sprint","Dev Tools Upgrade","CI/CD Pipeline","Cloud Scaling"},
+            premium  = {"Enterprise Suite","Custom API","White-Glove Onboarding","Dedicated Support","Executive Dashboard"},
+            seasonal = {"Product Launch","Hackathon Event","Beta Access Drop","Conference Keynote","Year-End Release"},
+        },
+        crisisPool = {
+            "server_outage","data_breach","security_vulnerability","key_engineer_quit",
+            "product_launch_delay","competitor_feature_copy","regulatory_investigation",
+            "bad_app_review","patent_dispute","ai_ethics_controversy",
+        },
+        exclusiveRD = {"platform_launch","ai_integration","security_fortress","developer_relations"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=2.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    fashion = {
+        displayName = "Fashion",
+        themeColor  = Color3.fromHex("#EC4899"),
+        iconKey     = "Industry.Fashion",
+        branchName  = "Boutique",
+        staffTitle  = "Stylist",
+        productName = "Collection",
+        hqName      = "Design Atelier",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Fast Fashion Line","Pop-Up Event","Flash Sale","Outlet Store","Capsule Collection"},
+            premium  = {"Designer Collab","Exclusive Members","Runway Show","Couture Line","Personal Shopper"},
+            seasonal = {"Summer Collection","Winter Gala","Fashion Week","Holiday Edition","Trend Drop"},
+        },
+        crisisPool = {
+            "knockoff_scandal","influencer_fallout","trend_miss","fabric_shortage","sweatshop_accusation",
+            "celebrity_disassociation","fashion_week_disaster","viral_bad_review","return_rate_spike","copyright_infringement",
+        },
+        exclusiveRD = {"signature_collection","influencer_network","sustainability_push","virtual_fitting_room"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    healthcare = {
+        displayName = "Healthcare",
+        themeColor  = Color3.fromHex("#10B981"),
+        iconKey     = "Industry.Healthcare",
+        branchName  = "Clinic",
+        staffTitle  = "Specialist",
+        productName = "Treatment Package",
+        hqName      = "Medical Center",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Walk-In Clinic","Telemedicine Line","Insurance Partnership","Screening Program","Community Outreach"},
+            premium  = {"Private Suite","Specialist Referral","Executive Health Plan","Concierge Medicine","Research Trial"},
+            seasonal = {"Flu Season Campaign","Annual Check-Up Drive","Mental Health Month","Summer Wellness","New Year Health"},
+        },
+        crisisPool = {
+            "malpractice_claim","regulatory_audit","supply_drug_shortage","staff_burnout_mass","insurance_dispute",
+            "health_scandal","data_privacy_breach","inspection_failure","staff_union_strike","competitor_undercutting",
+        },
+        exclusiveRD = {"clinical_excellence_protocol","digital_health_platform","compliance_shield","specialist_recruitment"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    entertainment = {
+        displayName = "Entertainment",
+        themeColor  = Color3.fromHex("#A855F7"),
+        iconKey     = "Industry.Entertainment",
+        branchName  = "Studio / Venue",
+        staffTitle  = "Creator",
+        productName = "Experience",
+        hqName      = "Creative Hub",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort","entertainment_district"},
+        upgradeNames = {
+            volume   = {"Streaming Rights","Syndication Deal","Box Office Boost","Fan Club","Merchandise Line"},
+            premium  = {"Exclusive Premiere","VIP Experience","Director\'s Cut","Private Screening","Brand Collaboration"},
+            seasonal = {"Summer Blockbuster","Holiday Special","Award Season Push","Viral Campaign","World Tour"},
+        },
+        crisisPool = {
+            "box_office_flop","streaming_rights_lost","celebrity_scandal","bad_critic_review","production_delay",
+            "copyright_lawsuit","audience_boycott","technical_failure_live","talent_dispute","piracy_surge",
+        },
+        exclusiveRD = {"blockbuster_engine","fan_engagement_platform","ip_portfolio","creator_network"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=4.0, -- 4x not 3x
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    cafe = {
+        displayName = "Coffee & Cafe",
+        themeColor  = Color3.fromHex("#78350F"),
+        iconKey     = "Industry.Cafe",
+        branchName  = "Cafe",
+        staffTitle  = "Barista",
+        productName = "Beverage",
+        hqName      = "Roastery HQ",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Drive-Through Lane","Express Counter","App Ordering","24/7 Service","Loyalty Stamp Card"},
+            premium  = {"Reserve Bar","Single Origin Menu","Barista Championship","Cupping Room","Private Label Roast"},
+            seasonal = {"Pumpkin Spice Season","Iced Summer Menu","Holiday Cups","Limited Reserve Drop","Anniversary Blend"},
+        },
+        crisisPool = {
+            "coffee_bean_shortage","barista_walkout","bad_health_inspection","competitor_price_war",
+            "equipment_breakdown","viral_bad_review","sustainability_controversy","franchise_dispute",
+            "supply_chain_delay","gentrification_protest",
+        },
+        exclusiveRD = {"cold_brew_innovation","subscription_app","bean_to_cup_brand","barista_academy"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=0.5, -- cheapest industry to open
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    fitness = {
+        displayName = "Fitness & Wellness",
+        themeColor  = Color3.fromHex("#06B6D4"),
+        iconKey     = "Industry.Fitness",
+        branchName  = "Gym / Studio",
+        staffTitle  = "Trainer",
+        productName = "Membership Plan",
+        hqName      = "Wellness Campus",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort","tech_campus"},
+        upgradeNames = {
+            volume   = {"Group Classes","24/7 Access Cards","Online Membership","Corporate Packages","Multi-Site Pass"},
+            premium  = {"Personal Training Suite","VIP Locker Room","Recovery Center","Spa & Sauna","Performance Lab"},
+            seasonal = {"New Year Challenge","Summer Body Push","Marathon Season Drive","Holiday Fitness Package","Resolution Sale"},
+        },
+        crisisPool = {
+            "equipment_injury_claim","trainer_walkout","overcrowding_complaint","hygiene_inspection_failure",
+            "competitor_price_war","membership_cancellation_wave","star_trainer_poached",
+            "viral_negative_review","regulatory_safety_audit","class_scheduling_disaster",
+        },
+        exclusiveRD = {"smart_gym_technology","wellness_app_platform","injury_prevention_protocol","certified_trainer_network"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0.60, -- income never drops below 60% baseline (membership model)
+            baseOfflineBonus=0, branchCostMult=1.0, branchIncomeMult=1.0,
+            unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    hotel = {
+        displayName = "Luxury Hotels",
+        themeColor  = Color3.fromHex("#D97706"),
+        iconKey     = "Industry.Hotel",
+        branchName  = "Hotel",
+        staffTitle  = "Concierge",
+        productName = "Stay Package",
+        hqName      = "Grand Headquarters",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Budget Suite Expansion","Online Booking Platform","Conference Center","Tour Package Deals","Airport Shuttle"},
+            premium  = {"Presidential Suite","Butler Service","Michelin Star Dining","Rooftop Bar","Spa Penthouse"},
+            seasonal = {"Summer Escape Package","New Year Gala","Holiday Retreat","Fashion Week Hosting","Award Season Package"},
+        },
+        crisisPool = {
+            "bad_review_viral","guest_injury_claim","health_inspection_failure","staff_strike",
+            "tourism_disruption","overbooking_disaster","food_safety_incident","maintenance_failure",
+            "celebrity_guest_scandal","competitor_undercutting",
+        },
+        exclusiveRD = {"white_glove_protocol","dynamic_pricing_ai","tourism_partnership","hospitality_academy"},
+        mechanics = {
+            offlineCapBase=12*3600, -- hotels earn 12h base offline before CFO/CEO bonuses
+            qualityDecayMult=2.0,   -- quality decays twice as fast (constant guest turnover)
+            seasonalEventMult=3.0, crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    retail = {
+        displayName = "Retail & E-Commerce",
+        themeColor  = Color3.fromHex("#BE123C"),
+        iconKey     = "Industry.Retail",
+        branchName  = "Store / Warehouse",
+        staffTitle  = "Sales Associate",
+        productName = "Product Line",
+        hqName      = "Distribution Hub",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Self-Checkout Stations","Flash Sale System","Bulk Buy Deals","Extended Store Hours","Loyalty Points Program"},
+            premium  = {"Personal Shopper","Members Club","Exclusive Product Lines","VIP After-Hours Shopping","Concierge Returns"},
+            seasonal = {"Black Friday Setup","Holiday Gifting Hub","Back-to-School Drive","Summer Clearance","Mega Sale Campaign"},
+        },
+        crisisPool = {
+            "stock_shortage","bad_review_viral","shoplifting_surge","returns_avalanche","competitor_sale_war",
+            "logistics_breakdown","counterfeit_goods_scandal","staff_theft_incident","data_breach","supplier_dispute",
+        },
+        exclusiveRD = {"inventory_ai_system","omnichannel_platform","anti_counterfeit_shield","customer_experience_lab"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            blackFridayMult=5.0, -- Black Friday event overrides seasonalEventMult to 5x for Retail
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    sports = {
+        displayName = "Sports & Recreation",
+        themeColor  = Color3.fromHex("#65A30D"),
+        iconKey     = "Industry.Sports",
+        branchName  = "Venue / Arena",
+        staffTitle  = "Coach",
+        productName = "Ticket / Experience",
+        hqName      = "Sports Complex",
+        validSlots  = {"mall","downtown","industrial","resort"}, -- limited slots: no airports/luxury/university etc.
+        upgradeNames = {
+            volume   = {"Season Ticket Drive","Community Programs","Youth Academy","Merchandise Shop","Multi-Sport Offering"},
+            premium  = {"VIP Box Seats","Premium Hospitality Lounge","Corporate Boxes","Meet & Greet Package","Exclusive Club"},
+            seasonal = {"World Cup Campaign","Championship Push","All-Star Weekend","Play-Off Season Blitz","Opening Day Event"},
+        },
+        crisisPool = {
+            "match_fixing_scandal","player_injury","crowd_safety_incident","broadcast_deal_lost","performance_slump",
+            "doping_controversy","stadium_maintenance_failure","ticket_fraud","rival_team_domination","weather_cancellation",
+        },
+        exclusiveRD = {"performance_analytics_platform","fan_engagement_app","injury_prevention_system","elite_coaching_network"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=4.0, -- 4x like Entertainment
+            worldCupMult=4.5, -- World Cup event fires at 4.5x for Sports specifically
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    automotive = {
+        displayName = "Automotive",
+        themeColor  = Color3.fromHex("#DC2626"),
+        iconKey     = "Industry.Automotive",
+        branchName  = "Dealership / Showroom",
+        staffTitle  = "Sales Consultant",
+        productName = "Vehicle",
+        hqName      = "Corporate Showroom",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Fleet Sales Program","Test Drive Incentive","Financing Partnership","Trade-In Program","Volume Dealer Status"},
+            premium  = {"Luxury Brand Partnership","Bespoke Configuration","VIP Delivery Experience","Chauffeur Demo Service","Celebrity Collection"},
+            seasonal = {"Motor Show Season","Year-End Sales Push","New Model Launch Event","Summer Drive Campaign","EV Awareness Month"},
+        },
+        crisisPool = {
+            "vehicle_recall","safety_defect_discovered","competitor_price_war","supply_chain_shortage","economic_downturn_impact",
+            "star_consultant_poached","bad_review_viral","regulatory_emission_audit","financing_scandal","test_drive_accident",
+        },
+        exclusiveRD = {"ev_transition_program","digital_showroom_platform","safety_excellence_award","expert_sales_training"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    realestate = {
+        displayName = "Real Estate",
+        themeColor  = Color3.fromHex("#64748B"),
+        iconKey     = "Industry.RealEstate",
+        branchName  = "Development Office",
+        staffTitle  = "Agent",
+        productName = "Property",
+        hqName      = "Portfolio Headquarters",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort"},
+        upgradeNames = {
+            volume   = {"Rental Unit Block","Co-Working Space","Student Housing Complex","Buy-to-Let Portfolio","Serviced Apartments"},
+            premium  = {"Luxury Penthouse Floor","Private Villa Estate","Branded Residences","Concierge Property","Ultra-Prime Portfolio"},
+            seasonal = {"Spring Market Push","Year-End Tax Sale","Investment Showcase","New Development Launch","Q4 Portfolio Drive"},
+        },
+        crisisPool = {
+            "market_crash","planning_permission_denied","tenant_dispute","construction_overrun","regulatory_compliance_failure",
+            "neighbor_protest","environmental_audit","property_damage","agent_misconduct","interest_rate_shock",
+        },
+        exclusiveRD = {"proptech_platform","green_building_cert","market_intelligence_system","elite_agent_training"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=1.0, perRdIncomeBonus=0,
+            membershipFloor=0, baseOfflineBonus=0.30, -- inherent +30% offline income before CFO/CEO
+            branchCostMult=1.0, branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    music = {
+        displayName = "Music & Record Label",
+        themeColor  = Color3.fromHex("#C026D3"),
+        iconKey     = "Industry.Music",
+        branchName  = "Label / Recording Studio",
+        staffTitle  = "Producer",
+        productName = "Album / Release",
+        hqName      = "Creative HQ",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort","entertainment_district"},
+        upgradeNames = {
+            volume   = {"Digital Distribution Deal","Playlist Placement","Sync Licensing Program","Merch Line","Streaming Royalty Push"},
+            premium  = {"Exclusive Club Residency","Limited Edition Vinyl","VIP Fan Experience","Major Artist Partnership","Label Flagship"},
+            seasonal = {"Award Season Push","Summer Festival Tour","Holiday Album Drop","New Year Release Blitz","Chart Attack Campaign"},
+        },
+        crisisPool = {
+            "artist_beef_scandal","album_flop","copyright_lawsuit","streaming_deal_lost","artist_quit",
+            "bad_critical_review","social_media_backlash","tour_cancellation","ghostwriting_accusation","sample_clearance_dispute",
+        },
+        exclusiveRD = {"algorithm_domination","artist_development_program","global_label_network","producer_academy"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.75, -- ignoring a crisis triggers secondary 75% of the time (vs 50%)
+            rdBonusMult=1.0, perRdIncomeBonus=0, membershipFloor=0, baseOfflineBonus=0,
+            branchCostMult=1.0, branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    socialmedia = {
+        displayName = "Social Media & Apps",
+        themeColor  = Color3.fromHex("#0EA5E9"),
+        iconKey     = "Industry.SocialMedia",
+        branchName  = "Platform Hub",
+        staffTitle  = "Growth Engineer",
+        productName = "Platform / Service",
+        hqName      = "Innovation Campus",
+        validSlots  = {"airport","mall","downtown","industrial","luxury","university","harbor","resort","tech_campus"},
+        upgradeNames = {
+            volume   = {"User Acquisition Push","Algorithm Optimization","Creator Partner Program","Free Tier Expansion","Ad Network Integration"},
+            premium  = {"Premium Subscription","Business Analytics Suite","Brand Partnership Portal","Verified Creator Tools","Enterprise API Access"},
+            seasonal = {"Viral Challenge Campaign","Trending Topic Blitz","Platform Awards Event","Year in Review","New Feature Global Launch"},
+        },
+        crisisPool = {
+            "data_breach_catastrophic","antitrust_investigation","algorithm_manipulation_accusation","moderator_revolt",
+            "viral_misinformation_wave","platform_outage","government_ban_threat","content_creator_exodus",
+            "ad_boycott_campaign","privacy_law_violation",
+        },
+        exclusiveRD = {"ai_recommendation_engine","privacy_shield_compliance","creator_monetization_hub","community_growth_engine"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=2.0, -- R&D bonuses doubled
+            perRdIncomeBonus=0.05, -- each completed R&D permanently adds +5% income
+            membershipFloor=0, baseOfflineBonus=0, branchCostMult=1.0,
+            branchIncomeMult=1.0, unlockRequiresIPO=false, brandGainMult=1.0,
+        },
+    },
+
+    -- ================================================================
+    aerospace = {
+        displayName = "Space & Aerospace",
+        themeColor  = Color3.fromHex("#1E3A5F"),
+        iconKey     = "Industry.Aerospace",
+        branchName  = "Facility / Launch Site",
+        staffTitle  = "Scientist",
+        productName = "Launch Contract",
+        hqName      = "Mission Control",
+        validSlots  = {"airport","industrial","tech_campus"}, -- only 3 valid slot types
+        upgradeNames = {
+            volume   = {"Satellite Constellation","Reusable Rocket Program","Launch Schedule Optimization","Small Sat Platform","Rideshare Program"},
+            premium  = {"Crewed Mission Contract","Deep Space Probe","Government Defense Contract","Space Tourism Package","Classified Payload"},
+            seasonal = {"Annual Launch Window","Space Race Event","ISS Resupply Season","Orbital Tourism Push","New Frontier Campaign"},
+        },
+        crisisPool = {
+            "launch_failure","satellite_malfunction","regulatory_approval_delay","key_scientist_quit",
+            "competitor_launch_success","component_supply_disruption","government_contract_cancelled",
+            "environmental_protest","technical_fault_discovered","funding_cut_announcement",
+        },
+        exclusiveRD = {"reusable_launch_vehicle","ai_mission_control","space_tourism_certification","elite_engineering_academy"},
+        mechanics = {
+            offlineCapBase=8*3600, qualityDecayMult=1.0, seasonalEventMult=3.0,
+            crisisIgnoreChance=0.50, rdBonusMult=3.0,  -- R&D bonuses are 3x stronger
+            perRdIncomeBonus=0, membershipFloor=0, baseOfflineBonus=0,
+            branchCostMult=5.0,   -- 5x more expensive to open
+            branchIncomeMult=5.0, -- but 5x higher income once running
+            unlockRequiresIPO=true, -- requires at least 1 completed IPO in profile
+            brandGainMult=1.5,    -- brand score gains 50% faster for this industry
+        },
+    },
+
+    -- ================================================================
+    -- HOW TO ADD A NEW INDUSTRY:
+    -- 1. Copy any block above. The fast_food block is the cleanest template.
+    -- 2. Change the key (e.g. "bakery") and fill in all display fields.
+    -- 3. Write 5 names for each upgrade path (volume, premium, seasonal).
+    -- 4. List exactly 10 crisis IDs in crisisPool. Each must exist in CrisisConfig.
+    -- 5. List up to 4 R&D project IDs in exclusiveRD. Each must exist in ResearchConfig.
+    -- 6. Set mechanics — if nothing is special, copy the fast_food mechanics block exactly.
+    -- 7. Upload a white-on-transparent icon PNG to Roblox, add the assetId to IconConfig.
+    -- 8. Run the game — GameRegistry.validate() checks everything on startup and warns you
+    --    if any crisis or R&D IDs are missing, or if upgradeNames counts are wrong.
+    -- Nothing else required. BranchService, EventService, IncomeService, and the client UI
+    -- all read IndustryConfig automatically.
+    -- ================================================================
+}
+```
+
+---
+
+## 22.4 Config File: CountryConfig
+
+```
+Path: ReplicatedStorage/Config/CountryConfig
+To add a new country: add one block. Demand keys missing from the demand table default to 1.0.
+```
+
+```lua
+-- ReplicatedStorage/Config/CountryConfig.lua
+-- Demand scale: 0.5=very low  0.8=low  1.0=avg  1.2=good  1.5=strong  1.8=very strong  2.0=exceptional
+
+return {
+
+    usa = {
+        displayName   = "USA",
+        flagAssetId   = "rbxassetid://0",  -- upload flag PNG to Roblox, paste Decal asset ID here
+        tier          = 1,
+        unlockRevenue = 0,           -- player needs this much cumulative revenue to see unlock button
+        unlockCost    = 0,           -- cash to unlock (0 = free default)
+        wealthMult    = 1.6,         -- multiplies all income from branches in this country
+        demand = {                   -- all 15 industry IDs must be listed for accuracy
+            fast_food=1.3, tech=1.8, fashion=1.4, healthcare=1.5, entertainment=1.8,
+            cafe=1.4, fitness=1.5, hotel=1.6, retail=1.5, sports=1.6,
+            automotive=1.5, realestate=1.7, music=1.8, socialmedia=1.9, aerospace=1.8,
+        },
+        cities = {
+            -- Each city needs a unique id (used as key), display name, and a slotType from CityConfig
+            {id="nyc",     name="New York City",  slotType="downtown"              },
+            {id="la",      name="Los Angeles",    slotType="entertainment_district" },
+            {id="chicago", name="Chicago",        slotType="industrial"             },
+            {id="houston", name="Houston",        slotType="airport"                },
+            {id="miami",   name="Miami",          slotType="luxury"                 },
+            {id="sf",      name="San Francisco",  slotType="tech_campus"            },
+            {id="seattle", name="Seattle",        slotType="harbor"                 },
+        },
+        crisisFlavorTags = {"fda_investigations","ftc_antitrust","union_strikes"},
+        -- OPTIONAL: give one city a unique bonus not in CityConfig
+        specialBonus = nil, -- example: {cityId="sf", bonusType="rd_speed", bonusValue=0.10}
+        notes = "Best all-round starting country.",
+    },
+
+    uk = {
+        displayName="United Kingdom", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=500000, unlockCost=100000, wealthMult=1.4,
+        demand={fast_food=1.1,tech=1.4,fashion=1.5,healthcare=1.6,entertainment=1.4,
+                cafe=1.6,fitness=1.5,hotel=1.5,retail=1.4,sports=1.8,
+                automotive=1.3,realestate=1.6,music=1.8,socialmedia=1.5,aerospace=1.4},
+        cities={
+            {id="london",name="London",slotType="luxury"},{id="manchester",name="Manchester",slotType="industrial"},
+            {id="edinburgh",name="Edinburgh",slotType="downtown"},{id="birmingham",name="Birmingham",slotType="mall"},
+            {id="bristol",name="Bristol",slotType="university"},
+        },
+        crisisFlavorTags={"gdpr_violations","media_scrutiny","nhs_competition"},
+        specialBonus=nil, notes="Fashion and Healthcare strongest. London Luxury is best slot.",
+    },
+
+    germany = {
+        displayName="Germany", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=500000, unlockCost=120000, wealthMult=1.5,
+        demand={fast_food=0.9,tech=1.5,fashion=1.1,healthcare=1.7,entertainment=0.9,
+                cafe=1.3,fitness=1.6,hotel=1.5,retail=1.3,sports=1.5,
+                automotive=1.8,realestate=1.5,music=1.2,socialmedia=1.3,aerospace=1.6},
+        cities={
+            {id="berlin",name="Berlin",slotType="tech_campus"},{id="munich",name="Munich",slotType="luxury"},
+            {id="hamburg",name="Hamburg",slotType="harbor"},{id="frankfurt",name="Frankfurt",slotType="airport"},
+            {id="cologne",name="Cologne",slotType="mall"},
+        },
+        crisisFlavorTags={"labor_union_strikes","strict_regulatory_audits","environmental_compliance"},
+        specialBonus=nil, notes="Healthcare powerhouse. Frankfurt Airport highest-earning slot.",
+    },
+
+    france = {
+        displayName="France", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=500000, unlockCost=130000, wealthMult=1.5,
+        demand={fast_food=1.0,tech=1.2,fashion=2.0,healthcare=1.3,entertainment=1.3,
+                cafe=1.8,fitness=1.4,hotel=1.8,retail=1.4,sports=1.4,
+                automotive=1.4,realestate=1.5,music=1.5,socialmedia=1.3,aerospace=1.4},
+        cities={
+            {id="paris",name="Paris",slotType="luxury"},{id="lyon",name="Lyon",slotType="downtown"},
+            {id="marseille",name="Marseille",slotType="harbor"},{id="bordeaux",name="Bordeaux",slotType="resort"},
+            {id="toulouse",name="Toulouse",slotType="university"},
+        },
+        crisisFlavorTags={"fashion_knockoff_lawsuits","labor_strikes","trade_disputes"},
+        specialBonus=nil, notes="Fashion capital. Paris Luxury = 2.0 Fashion demand.",
+    },
+
+    japan = {
+        displayName="Japan", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=500000, unlockCost=150000, wealthMult=1.6,
+        demand={fast_food=1.1,tech=1.8,fashion=1.7,healthcare=1.4,entertainment=1.6,
+                cafe=1.7,fitness=1.5,hotel=1.7,retail=1.5,sports=1.4,
+                automotive=1.8,realestate=1.5,music=1.6,socialmedia=1.6,aerospace=1.7},
+        cities={
+            {id="tokyo",name="Tokyo",slotType="luxury"},{id="osaka",name="Osaka",slotType="mall"},
+            {id="kyoto",name="Kyoto",slotType="resort"},{id="yokohama",name="Yokohama",slotType="harbor"},
+            {id="sapporo",name="Sapporo",slotType="downtown"},
+        },
+        crisisFlavorTags={"earthquake_disruptions","strict_quality_audits","cultural_sensitivity"},
+        specialBonus=nil, notes="Excellent Tech/Fashion/Entertainment. Tokyo one of best cities.",
+    },
+
+    canada = {
+        displayName="Canada", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=750000, unlockCost=150000, wealthMult=1.4,
+        demand={fast_food=1.2,tech=1.3,fashion=1.1,healthcare=1.7,entertainment=1.1,
+                cafe=1.5,fitness=1.5,hotel=1.4,retail=1.3,sports=1.4,
+                automotive=1.3,realestate=1.5,music=1.3,socialmedia=1.4,aerospace=1.4},
+        cities={
+            {id="toronto",name="Toronto",slotType="downtown"},{id="vancouver",name="Vancouver",slotType="resort"},
+            {id="montreal",name="Montreal",slotType="university"},{id="calgary",name="Calgary",slotType="industrial"},
+            {id="ottawa",name="Ottawa",slotType="airport"},
+        },
+        crisisFlavorTags={"supply_freeze","healthcare_regulation","environmental_protests"},
+        specialBonus=nil, notes="Healthcare specialist. Vancouver Resort hidden gem.",
+    },
+
+    australia = {
+        displayName="Australia", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=750000, unlockCost=160000, wealthMult=1.4,
+        demand={fast_food=1.3,tech=1.2,fashion=1.2,healthcare=1.5,entertainment=1.4,
+                cafe=1.7,fitness=1.6,hotel=1.6,retail=1.4,sports=1.6,
+                automotive=1.3,realestate=1.5,music=1.4,socialmedia=1.5,aerospace=1.3},
+        cities={
+            {id="sydney",name="Sydney",slotType="harbor"},{id="melbourne",name="Melbourne",slotType="downtown"},
+            {id="brisbane",name="Brisbane",slotType="mall"},{id="perth",name="Perth",slotType="industrial"},
+            {id="gold_coast",name="Gold Coast",slotType="resort"},
+        },
+        crisisFlavorTags={"environmental_protests","strict_food_standards","mining_disputes"},
+        specialBonus=nil, notes="Gold Coast Resort excellent for Entertainment Seasonal.",
+    },
+
+    south_korea = {
+        displayName="South Korea", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=1000000, unlockCost=180000, wealthMult=1.3,
+        demand={fast_food=1.2,tech=1.7,fashion=1.8,healthcare=1.3,entertainment=1.8,
+                cafe=1.8,fitness=1.6,hotel=1.5,retail=1.6,sports=1.5,
+                automotive=1.6,realestate=1.3,music=2.0,socialmedia=1.9,aerospace=1.5},
+        cities={
+            {id="seoul",name="Seoul",slotType="luxury"},{id="busan",name="Busan",slotType="harbor"},
+            {id="incheon",name="Incheon",slotType="airport"},{id="daegu",name="Daegu",slotType="mall"},
+            {id="jeju",name="Jeju",slotType="resort"},
+        },
+        crisisFlavorTags={"chaebol_competition","media_controversies","tech_patent_disputes"},
+        specialBonus=nil, notes="K-pop/K-beauty: Fashion, Entertainment, Music all very strong.",
+    },
+
+    netherlands = {
+        displayName="Netherlands", flagAssetId="rbxassetid://0",
+        tier=2, unlockRevenue=1000000, unlockCost=170000, wealthMult=1.5,
+        demand={fast_food=0.9,tech=1.6,fashion=1.2,healthcare=1.4,entertainment=1.2,
+                cafe=1.5,fitness=1.5,hotel=1.4,retail=1.3,sports=1.3,
+                automotive=1.3,realestate=1.4,music=1.3,socialmedia=1.5,aerospace=1.5},
+        cities={
+            {id="amsterdam",name="Amsterdam",slotType="harbor"},{id="rotterdam",name="Rotterdam",slotType="industrial"},
+            {id="the_hague",name="The Hague",slotType="downtown"},{id="eindhoven",name="Eindhoven",slotType="tech_campus"},
+            {id="utrecht",name="Utrecht",slotType="university"},
+        },
+        crisisFlavorTags={"gdpr_enforcement","financial_regulation","cycling_logistics_disruption"},
+        specialBonus={cityId="eindhoven", bonusType="rd_speed", bonusValue=0.10},
+        notes="Tech hub. Eindhoven Tech Campus +10% extra R&D speed.",
+    },
+
+    brazil = {
+        displayName="Brazil", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=400000, wealthMult=0.9,
+        demand={fast_food=1.6,tech=1.0,fashion=1.1,healthcare=1.1,entertainment=1.5,
+                cafe=1.3,fitness=1.3,hotel=1.4,retail=1.4,sports=2.0,
+                automotive=1.0,realestate=0.9,music=1.7,socialmedia=1.6,aerospace=0.8},
+        cities={
+            {id="sao_paulo",name="Sao Paulo",slotType="mall"},{id="rio",name="Rio de Janeiro",slotType="resort"},
+            {id="brasilia",name="Brasilia",slotType="downtown"},{id="salvador",name="Salvador",slotType="harbor"},
+            {id="curitiba",name="Curitiba",slotType="industrial"},
+        },
+        crisisFlavorTags={"currency_devaluation","political_instability","infrastructure_failure"},
+        specialBonus=nil, notes="Fast Food goldmine. Sports demand 2.0. Rio Resort for Entertainment.",
+    },
+
+    india = {
+        displayName="India", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=450000, wealthMult=0.7,
+        demand={fast_food=1.8,tech=1.3,fashion=0.8,healthcare=1.5,entertainment=1.2,
+                cafe=1.2,fitness=1.1,hotel=1.3,retail=1.4,sports=1.5,
+                automotive=1.0,realestate=0.9,music=1.5,socialmedia=1.7,aerospace=1.2},
+        cities={
+            {id="mumbai",name="Mumbai",slotType="mall"},{id="delhi",name="Delhi",slotType="downtown"},
+            {id="bangalore",name="Bangalore",slotType="tech_campus"},{id="chennai",name="Chennai",slotType="harbor"},
+            {id="hyderabad",name="Hyderabad",slotType="industrial"},{id="kolkata",name="Kolkata",slotType="airport"},
+        },
+        crisisFlavorTags={"infrastructure_disruption","regulatory_complexity","political_protests"},
+        specialBonus=nil, notes="Highest Fast Food demand (1.8). Bangalore Tech Campus strong.",
+    },
+
+    china = {
+        displayName="China", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=5000000, unlockCost=600000, wealthMult=1.1,
+        demand={fast_food=1.5,tech=1.6,fashion=1.3,healthcare=1.2,entertainment=1.7,
+                cafe=1.4,fitness=1.4,hotel=1.5,retail=1.7,sports=1.6,
+                automotive=1.5,realestate=1.2,music=1.3,socialmedia=1.0,aerospace=1.8},
+        cities={
+            {id="shanghai",name="Shanghai",slotType="mall"},{id="beijing",name="Beijing",slotType="downtown"},
+            {id="shenzhen",name="Shenzhen",slotType="tech_campus"},{id="guangzhou",name="Guangzhou",slotType="industrial"},
+            {id="chengdu",name="Chengdu",slotType="airport"},{id="hangzhou",name="Hangzhou",slotType="luxury"},
+        },
+        crisisFlavorTags={"regulatory_crackdown","trade_restrictions","censorship_compliance"},
+        specialBonus=nil, notes="Huge market. Social Media demand very low (government restrictions).",
+    },
+
+    spain = {
+        displayName="Spain", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=380000, wealthMult=1.2,
+        demand={fast_food=1.1,tech=1.1,fashion=1.4,healthcare=1.3,entertainment=1.5,
+                cafe=1.5,fitness=1.4,hotel=1.7,retail=1.3,sports=1.8,
+                automotive=1.2,realestate=1.2,music=1.5,socialmedia=1.4,aerospace=1.1},
+        cities={
+            {id="madrid",name="Madrid",slotType="downtown"},{id="barcelona",name="Barcelona",slotType="resort"},
+            {id="valencia",name="Valencia",slotType="harbor"},{id="seville",name="Seville",slotType="airport"},
+            {id="bilbao",name="Bilbao",slotType="university"},
+        },
+        crisisFlavorTags={"tourism_seasonality","labor_strikes","regional_political_tension"},
+        specialBonus=nil, notes="Barcelona Resort excellent for Fashion Seasonal.",
+    },
+
+    italy = {
+        displayName="Italy", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=400000, wealthMult=1.3,
+        demand={fast_food=1.0,tech=1.1,fashion=1.9,healthcare=1.4,entertainment=1.3,
+                cafe=1.6,fitness=1.4,hotel=1.7,retail=1.4,sports=1.6,
+                automotive=1.6,realestate=1.3,music=1.4,socialmedia=1.3,aerospace=1.2},
+        cities={
+            {id="milan",name="Milan",slotType="luxury"},{id="rome",name="Rome",slotType="downtown"},
+            {id="florence",name="Florence",slotType="resort"},{id="naples",name="Naples",slotType="harbor"},
+            {id="turin",name="Turin",slotType="industrial"},
+        },
+        crisisFlavorTags={"fashion_knockoffs","regulatory_bureaucracy","political_instability"},
+        specialBonus=nil, notes="Milan Luxury second-best Fashion slot after Paris.",
+    },
+
+    mexico = {
+        displayName="Mexico", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=350000, wealthMult=0.8,
+        demand={fast_food=1.7,tech=0.9,fashion=1.0,healthcare=1.0,entertainment=1.4,
+                cafe=1.4,fitness=1.2,hotel=1.5,retail=1.3,sports=1.7,
+                automotive=1.1,realestate=0.9,music=1.6,socialmedia=1.5,aerospace=0.8},
+        cities={
+            {id="mexico_city",name="Mexico City",slotType="mall"},{id="guadalajara",name="Guadalajara",slotType="industrial"},
+            {id="monterrey",name="Monterrey",slotType="downtown"},{id="cancun",name="Cancun",slotType="resort"},
+            {id="tijuana",name="Tijuana",slotType="airport"},
+        },
+        crisisFlavorTags={"logistics_disruption","crime_morale_impact","customs_delays"},
+        specialBonus=nil, notes="Fast Food second-best after India. Cancun Resort for Entertainment.",
+    },
+
+    singapore = {
+        displayName="Singapore", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=4000000, unlockCost=500000, wealthMult=1.8,
+        demand={fast_food=1.1,tech=1.7,fashion=1.6,healthcare=1.5,entertainment=1.3,
+                cafe=1.6,fitness=1.7,hotel=1.8,retail=1.6,sports=1.3,
+                automotive=1.4,realestate=1.8,music=1.3,socialmedia=1.6,aerospace=1.5},
+        cities={
+            {id="marina_bay",name="Marina Bay",slotType="luxury"},{id="orchard",name="Orchard Road",slotType="mall"},
+            {id="changi",name="Changi",slotType="airport"},{id="jurong",name="Jurong",slotType="industrial"},
+            {id="sentosa",name="Sentosa",slotType="resort"},
+        },
+        crisisFlavorTags={"strict_regulatory_fines","competitive_tech_market","expat_staff_turnover"},
+        specialBonus={cityId="changi", bonusType="offline_income", bonusValue=0.05},
+        notes="Small but incredibly wealthy. Changi Airport +5% offline income bonus.",
+    },
+
+    sweden = {
+        displayName="Sweden", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=4000000, unlockCost=480000, wealthMult=1.5,
+        demand={fast_food=0.8,tech=1.6,fashion=1.2,healthcare=1.6,entertainment=1.1,
+                cafe=1.5,fitness=1.7,hotel=1.4,retail=1.3,sports=1.3,
+                automotive=1.4,realestate=1.4,music=1.6,socialmedia=1.5,aerospace=1.5},
+        cities={
+            {id="stockholm",name="Stockholm",slotType="downtown"},{id="gothenburg",name="Gothenburg",slotType="harbor"},
+            {id="malmo",name="Malmo",slotType="university"},{id="uppsala",name="Uppsala",slotType="tech_campus"},
+            {id="kiruna",name="Kiruna",slotType="industrial"},
+        },
+        crisisFlavorTags={"high_labor_costs","environmental_scrutiny","work_life_balance_disputes"},
+        specialBonus=nil, notes="Excellent Tech+Healthcare combo. Lowest crisis frequency any country.",
+    },
+
+    switzerland = {
+        displayName="Switzerland", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=5000000, unlockCost=600000, wealthMult=2.0,
+        demand={fast_food=0.6,tech=1.4,fashion=1.5,healthcare=2.0,entertainment=0.9,
+                cafe=1.3,fitness=1.8,hotel=1.9,retail=1.3,sports=0.9,
+                automotive=1.8,realestate=1.9,music=0.8,socialmedia=1.2,aerospace=1.5},
+        cities={
+            {id="zurich",name="Zurich",slotType="luxury"},{id="geneva",name="Geneva",slotType="downtown"},
+            {id="basel",name="Basel",slotType="university"},{id="bern",name="Bern",slotType="airport"},
+            {id="lausanne",name="Lausanne",slotType="resort"},
+        },
+        crisisFlavorTags={"strict_privacy_laws","expensive_compliance","currency_volatility"},
+        specialBonus=nil, notes="Highest wealth mult (2.0). Healthcare demand 2.0. Very expensive but worth it.",
+    },
+
+    turkey = {
+        displayName="Turkey", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=360000, wealthMult=0.9,
+        demand={fast_food=1.4,tech=1.0,fashion=1.3,healthcare=1.1,entertainment=1.2,
+                cafe=1.4,fitness=1.2,hotel=1.6,retail=1.3,sports=1.4,
+                automotive=1.1,realestate=1.0,music=1.3,socialmedia=1.4,aerospace=0.8},
+        cities={
+            {id="istanbul",name="Istanbul",slotType="mall"},{id="ankara",name="Ankara",slotType="downtown"},
+            {id="izmir",name="Izmir",slotType="harbor"},{id="antalya",name="Antalya",slotType="resort"},
+            {id="bursa",name="Bursa",slotType="industrial"},
+        },
+        crisisFlavorTags={"currency_inflation","political_pressure","tourism_volatility"},
+        specialBonus=nil, notes="Istanbul Mall high traffic for Fast Food. Antalya Resort for Fashion Seasonal.",
+    },
+
+    poland = {
+        displayName="Poland", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=3000000, unlockCost=340000, wealthMult=1.0,
+        demand={fast_food=1.2,tech=1.3,fashion=1.0,healthcare=1.2,entertainment=1.1,
+                cafe=1.3,fitness=1.3,hotel=1.2,retail=1.2,sports=1.3,
+                automotive=1.1,realestate=1.1,music=1.2,socialmedia=1.3,aerospace=1.1},
+        cities={
+            {id="warsaw",name="Warsaw",slotType="downtown"},{id="krakow",name="Krakow",slotType="university"},
+            {id="gdansk",name="Gdansk",slotType="harbor"},{id="wroclaw",name="Wroclaw",slotType="tech_campus"},
+            {id="poznan",name="Poznan",slotType="industrial"},
+        },
+        crisisFlavorTags={"eu_regulatory_compliance","labor_market_tightness","logistics_disruption"},
+        specialBonus={cityId="wroclaw", bonusType="rd_speed", bonusValue=0.10},
+        notes="Solid all-rounder. Wroclaw Tech Campus same R&D bonus as Eindhoven.",
+    },
+
+    israel = {
+        displayName="Israel", flagAssetId="rbxassetid://0",
+        tier=3, unlockRevenue=4000000, unlockCost=500000, wealthMult=1.4,
+        demand={fast_food=1.0,tech=2.0,fashion=1.1,healthcare=1.5,entertainment=1.2,
+                cafe=1.4,fitness=1.5,hotel=1.4,retail=1.3,sports=1.2,
+                automotive=1.3,realestate=1.3,music=1.2,socialmedia=1.7,aerospace=1.8},
+        cities={
+            {id="tel_aviv",name="Tel Aviv",slotType="tech_campus"},{id="jerusalem",name="Jerusalem",slotType="downtown"},
+            {id="haifa",name="Haifa",slotType="harbor"},{id="eilat",name="Eilat",slotType="resort"},
+            {id="beer_sheva",name="Beer Sheva",slotType="university"},
+        },
+        crisisFlavorTags={"geopolitical_tension","security_concerns","startup_competition"},
+        specialBonus=nil, notes="Highest Tech demand (2.0) tied with USA. Tel Aviv Tech Campus is a gem.",
+    },
+
+    -- TIER 4
+    uae = {
+        displayName="UAE", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=1500000, wealthMult=1.9,
+        demand={fast_food=1.0,tech=1.4,fashion=1.9,healthcare=1.3,entertainment=1.7,
+                cafe=1.5,fitness=1.8,hotel=2.0,retail=1.7,sports=1.4,
+                automotive=1.8,realestate=1.9,music=1.4,socialmedia=1.6,aerospace=1.4},
+        cities={
+            {id="dubai",name="Dubai",slotType="luxury"},{id="abu_dhabi",name="Abu Dhabi",slotType="downtown"},
+            {id="sharjah",name="Sharjah",slotType="mall"},{id="rak",name="Ras Al Khaimah",slotType="resort"},
+            {id="fujairah",name="Fujairah",slotType="harbor"},
+        },
+        crisisFlavorTags={"cultural_sensitivity_violations","labor_disputes","regulatory_surprises"},
+        specialBonus=nil, notes="Dubai Luxury third-best Fashion slot. Hotel demand 2.0. Wealth 1.9.",
+    },
+
+    saudi_arabia = {
+        displayName="Saudi Arabia", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=2000000, wealthMult=1.8,
+        demand={fast_food=1.2,tech=1.2,fashion=1.0,healthcare=1.6,entertainment=1.3,
+                cafe=1.3,fitness=1.5,hotel=1.7,retail=1.4,sports=1.3,
+                automotive=1.5,realestate=1.6,music=0.8,socialmedia=1.2,aerospace=1.5},
+        cities={
+            {id="riyadh",name="Riyadh",slotType="downtown"},{id="jeddah",name="Jeddah",slotType="mall"},
+            {id="mecca",name="Mecca",slotType="airport"},{id="neom",name="NEOM",slotType="tech_campus"},
+            {id="dammam",name="Dammam",slotType="industrial"},
+        },
+        crisisFlavorTags={"regulatory_restrictions","cultural_compliance_costs","political_instability"},
+        specialBonus={cityId="neom", bonusType="tech_income", bonusValue=0.15},
+        notes="NEOM Tech Campus unique futuristic slot +15% Tech income.",
+    },
+
+    indonesia = {
+        displayName="Indonesia", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=1500000, wealthMult=0.7,
+        demand={fast_food=1.8,tech=1.1,fashion=0.9,healthcare=1.0,entertainment=1.3,
+                cafe=1.4,fitness=1.1,hotel=1.3,retail=1.5,sports=1.4,
+                automotive=0.9,realestate=0.8,music=1.3,socialmedia=1.6,aerospace=0.7},
+        cities={
+            {id="jakarta",name="Jakarta",slotType="mall"},{id="surabaya",name="Surabaya",slotType="industrial"},
+            {id="bali",name="Bali",slotType="resort"},{id="medan",name="Medan",slotType="downtown"},
+            {id="bandung",name="Bandung",slotType="university"},
+        },
+        crisisFlavorTags={"logistics_failure","monsoon_disruption","labor_regulation"},
+        specialBonus=nil, notes="Second-highest Fast Food demand (1.8). Bali Resort for Entertainment.",
+    },
+
+    argentina = {
+        displayName="Argentina", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=1600000, wealthMult=0.8,
+        demand={fast_food=1.5,tech=1.0,fashion=1.1,healthcare=1.1,entertainment=1.3,
+                cafe=1.4,fitness=1.3,hotel=1.3,retail=1.3,sports=1.9,
+                automotive=1.0,realestate=0.8,music=1.5,socialmedia=1.4,aerospace=0.8},
+        cities={
+            {id="buenos_aires",name="Buenos Aires",slotType="downtown"},{id="cordoba",name="Cordoba",slotType="university"},
+            {id="rosario",name="Rosario",slotType="industrial"},{id="mendoza",name="Mendoza",slotType="resort"},
+            {id="mar_del_plata",name="Mar del Plata",slotType="harbor"},
+        },
+        crisisFlavorTags={"currency_devaluation_severe","inflation_events","political_crisis"},
+        specialBonus=nil, notes="High currency crisis rate. Sports 1.9. Fast Food strong when stable.",
+    },
+
+    south_africa = {
+        displayName="South Africa", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=1800000, wealthMult=0.9,
+        demand={fast_food=1.3,tech=1.0,fashion=1.1,healthcare=1.2,entertainment=1.4,
+                cafe=1.3,fitness=1.3,hotel=1.4,retail=1.3,sports=1.6,
+                automotive=1.1,realestate=1.0,music=1.5,socialmedia=1.4,aerospace=0.8},
+        cities={
+            {id="johannesburg",name="Johannesburg",slotType="downtown"},{id="cape_town",name="Cape Town",slotType="resort"},
+            {id="durban",name="Durban",slotType="harbor"},{id="pretoria",name="Pretoria",slotType="airport"},
+            {id="port_elizabeth",name="Port Elizabeth",slotType="industrial"},
+        },
+        crisisFlavorTags={"power_outages","political_protests","infrastructure_failures"},
+        specialBonus=nil, notes="Cape Town Resort excellent for Entertainment. Unique Load Shedding crisis.",
+    },
+
+    nigeria = {
+        displayName="Nigeria", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=20000000, unlockCost=2000000, wealthMult=0.6,
+        demand={fast_food=1.7,tech=0.8,fashion=0.9,healthcare=0.9,entertainment=1.5,
+                cafe=1.2,fitness=0.9,hotel=1.2,retail=1.4,sports=1.7,
+                automotive=0.8,realestate=0.7,music=1.9,socialmedia=1.6,aerospace=0.6},
+        cities={
+            {id="lagos",name="Lagos",slotType="mall"},{id="abuja",name="Abuja",slotType="downtown"},
+            {id="kano",name="Kano",slotType="industrial"},{id="ibadan",name="Ibadan",slotType="university"},
+            {id="port_harcourt",name="Port Harcourt",slotType="harbor"},
+        },
+        crisisFlavorTags={"infrastructure_failure","political_instability","logistics_breakdown"},
+        specialBonus=nil, notes="Very high Fast Food, Music, Sports demand. High risk high reward.",
+    },
+
+    russia = {
+        displayName="Russia", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=20000000, unlockCost=2500000, wealthMult=1.0,
+        demand={fast_food=1.1,tech=1.2,fashion=1.1,healthcare=1.3,entertainment=1.1,
+                cafe=1.3,fitness=1.3,hotel=1.3,retail=1.2,sports=1.4,
+                automotive=1.2,realestate=1.1,music=1.3,socialmedia=0.9,aerospace=1.6},
+        cities={
+            {id="moscow",name="Moscow",slotType="downtown"},{id="st_petersburg",name="St. Petersburg",slotType="luxury"},
+            {id="novosibirsk",name="Novosibirsk",slotType="industrial"},{id="kazan",name="Kazan",slotType="mall"},
+            {id="sochi",name="Sochi",slotType="resort"},
+        },
+        crisisFlavorTags={"sanctions_complications","regulatory_pressure","political_instability"},
+        specialBonus=nil, notes="High crisis frequency. Sochi Resort skiing-seasonal bonus.",
+    },
+
+    vietnam = {
+        displayName="Vietnam", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=1500000, wealthMult=0.6,
+        demand={fast_food=1.6,tech=1.3,fashion=1.0,healthcare=0.9,entertainment=1.1,
+                cafe=1.5,fitness=1.1,hotel=1.4,retail=1.4,sports=1.3,
+                automotive=0.9,realestate=0.8,music=1.2,socialmedia=1.5,aerospace=0.7},
+        cities={
+            {id="hcmc",name="Ho Chi Minh City",slotType="mall"},{id="hanoi",name="Hanoi",slotType="downtown"},
+            {id="da_nang",name="Da Nang",slotType="resort"},{id="hai_phong",name="Hai Phong",slotType="harbor"},
+            {id="binh_duong",name="Binh Duong",slotType="industrial"},
+        },
+        crisisFlavorTags={"supply_chain_delays","regulatory_changes","rapid_market_shifts"},
+        specialBonus=nil, notes="Emerging market. Ho Chi Minh Mall excellent Fast Food throughput.",
+    },
+
+    thailand = {
+        displayName="Thailand", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=15000000, unlockCost=1500000, wealthMult=0.8,
+        demand={fast_food=1.4,tech=1.1,fashion=1.3,healthcare=1.1,entertainment=1.6,
+                cafe=1.5,fitness=1.3,hotel=1.9,retail=1.4,sports=1.4,
+                automotive=1.0,realestate=1.0,music=1.3,socialmedia=1.4,aerospace=0.8},
+        cities={
+            {id="bangkok",name="Bangkok",slotType="mall"},{id="phuket",name="Phuket",slotType="resort"},
+            {id="chiang_mai",name="Chiang Mai",slotType="downtown"},{id="pattaya",name="Pattaya",slotType="resort"},
+            {id="chonburi",name="Chonburi",slotType="industrial"},
+        },
+        crisisFlavorTags={"tourism_volatility","political_protests","flooding_events"},
+        specialBonus=nil, notes="Two Resort slots! Phuket Resort top Entertainment Seasonal earner Tier 4.",
+    },
+
+    malaysia = {
+        displayName="Malaysia", flagAssetId="rbxassetid://0",
+        tier=4, unlockRevenue=12000000, unlockCost=1400000, wealthMult=0.9,
+        demand={fast_food=1.5,tech=1.3,fashion=1.1,healthcare=1.2,entertainment=1.2,
+                cafe=1.5,fitness=1.3,hotel=1.5,retail=1.4,sports=1.3,
+                automotive=1.1,realestate=1.0,music=1.2,socialmedia=1.4,aerospace=0.8},
+        cities={
+            {id="kuala_lumpur",name="Kuala Lumpur",slotType="downtown"},{id="petaling_jaya",name="Petaling Jaya",slotType="mall"},
+            {id="penang",name="Penang",slotType="harbor"},{id="johor_bahru",name="Johor Bahru",slotType="industrial"},
+            {id="kota_kinabalu",name="Kota Kinabalu",slotType="resort"},
+        },
+        crisisFlavorTags={"political_uncertainty","currency_weakness","logistics_delays"},
+        specialBonus=nil, notes="Solid mid-tier country with no outstanding weaknesses.",
+    },
+
+    -- TIER 5
+    egypt = {
+        displayName="Egypt", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=6000000, wealthMult=0.6,
+        demand={fast_food=1.5,tech=0.9,fashion=1.2,healthcare=1.0,entertainment=1.4,
+                cafe=1.3,fitness=1.0,hotel=1.5,retail=1.3,sports=1.4,
+                automotive=0.9,realestate=0.8,music=1.3,socialmedia=1.4,aerospace=0.7},
+        cities={
+            {id="cairo",name="Cairo",slotType="mall"},{id="alexandria",name="Alexandria",slotType="harbor"},
+            {id="sharm_el_sheikh",name="Sharm El-Sheikh",slotType="resort"},{id="luxor",name="Luxor",slotType="downtown"},
+            {id="giza",name="Giza",slotType="airport"},
+        },
+        crisisFlavorTags={"political_instability","tourism_disruption","currency_crisis"},
+        specialBonus={cityId="giza", bonusType="fashion_income", bonusValue=0.08},
+        notes="Giza Airport Ancient Market bonus +8% Fashion income.",
+    },
+
+    kenya = {
+        displayName="Kenya", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=6000000, wealthMult=0.5,
+        demand={fast_food=1.5,tech=1.0,fashion=0.9,healthcare=1.1,entertainment=1.3,
+                cafe=1.3,fitness=1.0,hotel=1.3,retail=1.3,sports=1.5,
+                automotive=0.8,realestate=0.7,music=1.5,socialmedia=1.4,aerospace=0.6},
+        cities={
+            {id="nairobi",name="Nairobi",slotType="downtown"},{id="mombasa",name="Mombasa",slotType="harbor"},
+            {id="kisumu",name="Kisumu",slotType="mall"},{id="nakuru",name="Nakuru",slotType="industrial"},
+            {id="eldoret",name="Eldoret",slotType="airport"},
+        },
+        crisisFlavorTags={"infrastructure_gaps","climate_events","political_protests"},
+        specialBonus=nil, notes="Nairobi growing fast. Mobile adoption makes this a surprise Tech opportunity.",
+    },
+
+    morocco = {
+        displayName="Morocco", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=7000000, wealthMult=0.7,
+        demand={fast_food=1.2,tech=0.9,fashion=1.6,healthcare=1.0,entertainment=1.3,
+                cafe=1.4,fitness=1.1,hotel=1.6,retail=1.3,sports=1.2,
+                automotive=0.9,realestate=0.9,music=1.2,socialmedia=1.3,aerospace=0.7},
+        cities={
+            {id="casablanca",name="Casablanca",slotType="downtown"},{id="marrakech",name="Marrakech",slotType="resort"},
+            {id="rabat",name="Rabat",slotType="airport"},{id="tangier",name="Tangier",slotType="harbor"},
+            {id="fes",name="Fes",slotType="university"},
+        },
+        crisisFlavorTags={"tourism_disruption","political_tension","supply_chain_issues"},
+        specialBonus=nil, notes="Marrakech Resort strong for Fashion. Medina Market bonus.",
+    },
+
+    colombia = {
+        displayName="Colombia", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=7000000, wealthMult=0.7,
+        demand={fast_food=1.4,tech=1.0,fashion=1.1,healthcare=1.1,entertainment=1.4,
+                cafe=1.5,fitness=1.2,hotel=1.4,retail=1.3,sports=1.6,
+                automotive=0.9,realestate=0.8,music=1.6,socialmedia=1.4,aerospace=0.7},
+        cities={
+            {id="bogota",name="Bogota",slotType="downtown"},{id="medellin",name="Medellin",slotType="university"},
+            {id="cali",name="Cali",slotType="mall"},{id="cartagena",name="Cartagena",slotType="resort"},
+            {id="barranquilla",name="Barranquilla",slotType="harbor"},
+        },
+        crisisFlavorTags={"security_concerns","political_instability","logistics_disruption"},
+        specialBonus={cityId="medellin", bonusType="tech_income", bonusValue=0.10},
+        notes="Medellin Tech Innovation bonus +10% Tech income.",
+    },
+
+    chile = {
+        displayName="Chile", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=8000000, wealthMult=1.0,
+        demand={fast_food=1.3,tech=1.2,fashion=1.1,healthcare=1.3,entertainment=1.2,
+                cafe=1.4,fitness=1.3,hotel=1.4,retail=1.3,sports=1.4,
+                automotive=1.1,realestate=1.0,music=1.2,socialmedia=1.3,aerospace=0.9},
+        cities={
+            {id="santiago",name="Santiago",slotType="downtown"},{id="valparaiso",name="Valparaiso",slotType="harbor"},
+            {id="concepcion",name="Concepcion",slotType="university"},{id="antofagasta",name="Antofagasta",slotType="industrial"},
+            {id="vina_del_mar",name="Vina del Mar",slotType="resort"},
+        },
+        crisisFlavorTags={"earthquake_events","political_protests","copper_market_impact"},
+        specialBonus=nil, notes="Most stable South American country. Lowest crisis frequency in Tier 5.",
+    },
+
+    philippines = {
+        displayName="Philippines", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=6500000, wealthMult=0.6,
+        demand={fast_food=1.7,tech=1.1,fashion=0.9,healthcare=1.0,entertainment=1.5,
+                cafe=1.4,fitness=1.0,hotel=1.4,retail=1.4,sports=1.5,
+                automotive=0.8,realestate=0.7,music=1.5,socialmedia=1.7,aerospace=0.6},
+        cities={
+            {id="manila",name="Manila",slotType="mall"},{id="cebu",name="Cebu",slotType="harbor"},
+            {id="davao",name="Davao",slotType="downtown"},{id="quezon_city",name="Quezon City",slotType="university"},
+            {id="boracay",name="Boracay",slotType="resort"},
+        },
+        crisisFlavorTags={"typhoon_events","political_volatility","infrastructure_failure"},
+        specialBonus=nil, notes="Third-highest Fast Food demand (1.7). Boracay Resort for Entertainment.",
+    },
+
+    pakistan = {
+        displayName="Pakistan", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=6000000, wealthMult=0.5,
+        demand={fast_food=1.7,tech=0.8,fashion=0.8,healthcare=0.9,entertainment=1.0,
+                cafe=1.1,fitness=0.9,hotel=1.1,retail=1.3,sports=1.4,
+                automotive=0.8,realestate=0.7,music=1.1,socialmedia=1.3,aerospace=0.6},
+        cities={
+            {id="karachi",name="Karachi",slotType="industrial"},{id="lahore",name="Lahore",slotType="mall"},
+            {id="islamabad",name="Islamabad",slotType="downtown"},{id="faisalabad",name="Faisalabad",slotType="university"},
+            {id="rawalpindi",name="Rawalpindi",slotType="airport"},
+        },
+        crisisFlavorTags={"political_instability","power_outages","currency_crisis","security_concerns"},
+        specialBonus=nil, notes="Very high Fast Food volume despite low wealth. Cheap unlock, high risk.",
+    },
+
+    bangladesh = {
+        displayName="Bangladesh", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=5500000, wealthMult=0.4,
+        demand={fast_food=1.8,tech=0.7,fashion=1.3,healthcare=0.8,entertainment=0.9,
+                cafe=1.1,fitness=0.8,hotel=1.0,retail=1.3,sports=1.2,
+                automotive=0.6,realestate=0.5,music=1.1,socialmedia=1.3,aerospace=0.5},
+        cities={
+            {id="dhaka",name="Dhaka",slotType="industrial"},{id="chittagong",name="Chittagong",slotType="harbor"},
+            {id="sylhet",name="Sylhet",slotType="downtown"},{id="rajshahi",name="Rajshahi",slotType="mall"},
+            {id="khulna",name="Khulna",slotType="university"},
+        },
+        crisisFlavorTags={"flooding_events","labor_unrest","infrastructure_failure","supply_chain_breakdown"},
+        specialBonus=nil, notes="Cheapest Tier 5 unlock. Highest FF demand (1.8) alongside India. Very high risk.",
+    },
+
+    denmark = {
+        displayName="Denmark", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=80000000, unlockCost=9000000, wealthMult=1.6,
+        demand={fast_food=0.8,tech=1.5,fashion=1.2,healthcare=1.8,entertainment=1.0,
+                cafe=1.5,fitness=1.7,hotel=1.4,retail=1.3,sports=1.2,
+                automotive=1.3,realestate=1.4,music=1.3,socialmedia=1.4,aerospace=1.4},
+        cities={
+            {id="copenhagen",name="Copenhagen",slotType="downtown"},{id="aarhus",name="Aarhus",slotType="university"},
+            {id="odense",name="Odense",slotType="industrial"},{id="aalborg",name="Aalborg",slotType="harbor"},
+            {id="esbjerg",name="Esbjerg",slotType="airport"},
+        },
+        crisisFlavorTags={"labor_cost_spikes","strict_environmental_compliance","regulatory_changes"},
+        specialBonus=nil, notes="Very high Healthcare demand. Copenhagen one of best Healthcare cities.",
+    },
+
+    finland = {
+        displayName="Finland", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=80000000, unlockCost=9000000, wealthMult=1.5,
+        demand={fast_food=0.7,tech=1.8,fashion=1.0,healthcare=1.6,entertainment=0.9,
+                cafe=1.4,fitness=1.6,hotel=1.3,retail=1.2,sports=1.2,
+                automotive=1.3,realestate=1.3,music=1.3,socialmedia=1.5,aerospace=1.6},
+        cities={
+            {id="helsinki",name="Helsinki",slotType="tech_campus"},{id="espoo",name="Espoo",slotType="university"},
+            {id="tampere",name="Tampere",slotType="industrial"},{id="turku",name="Turku",slotType="harbor"},
+            {id="oulu",name="Oulu",slotType="downtown"},
+        },
+        crisisFlavorTags={"extreme_weather_disruption","high_labor_costs","small_market_saturation"},
+        specialBonus={cityId="helsinki", bonusType="rd_speed", bonusValue=0.20},
+        notes="Helsinki Tech Campus strongest R&D bonus city in game (+20% research speed).",
+    },
+
+    norway = {
+        displayName="Norway", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=80000000, unlockCost=10000000, wealthMult=1.8,
+        demand={fast_food=0.7,tech=1.4,fashion=1.1,healthcare=1.9,entertainment=0.9,
+                cafe=1.4,fitness=1.8,hotel=1.6,retail=1.2,sports=1.3,
+                automotive=1.4,realestate=1.5,music=1.2,socialmedia=1.4,aerospace=1.5},
+        cities={
+            {id="oslo",name="Oslo",slotType="downtown"},{id="bergen",name="Bergen",slotType="harbor"},
+            {id="stavanger",name="Stavanger",slotType="industrial"},{id="trondheim",name="Trondheim",slotType="university"},
+            {id="tromso",name="Tromso",slotType="resort"},
+        },
+        crisisFlavorTags={"oil_price_sensitivity","environmental_protests","extreme_weather"},
+        specialBonus=nil, notes="Highest Healthcare demand of all Tier 5 countries. Very expensive, massive margin.",
+    },
+
+    austria = {
+        displayName="Austria", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=80000000, unlockCost=9500000, wealthMult=1.5,
+        demand={fast_food=0.9,tech=1.3,fashion=1.5,healthcare=1.7,entertainment=1.2,
+                cafe=1.5,fitness=1.5,hotel=1.7,retail=1.3,sports=1.3,
+                automotive=1.4,realestate=1.4,music=1.4,socialmedia=1.3,aerospace=1.3},
+        cities={
+            {id="vienna",name="Vienna",slotType="luxury"},{id="graz",name="Graz",slotType="university"},
+            {id="linz",name="Linz",slotType="industrial"},{id="salzburg",name="Salzburg",slotType="resort"},
+            {id="innsbruck",name="Innsbruck",slotType="downtown"},
+        },
+        crisisFlavorTags={"regulatory_compliance","labor_disputes","high_overhead"},
+        specialBonus=nil, notes="Vienna Luxury top tier for Fashion. Salzburg Resort for Entertainment.",
+    },
+
+    belgium = {
+        displayName="Belgium", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=80000000, unlockCost=9000000, wealthMult=1.4,
+        demand={fast_food=1.0,tech=1.4,fashion=1.4,healthcare=1.5,entertainment=1.1,
+                cafe=1.4,fitness=1.4,hotel=1.4,retail=1.3,sports=1.3,
+                automotive=1.3,realestate=1.3,music=1.2,socialmedia=1.4,aerospace=1.3},
+        cities={
+            {id="brussels",name="Brussels",slotType="downtown"},{id="antwerp",name="Antwerp",slotType="harbor"},
+            {id="ghent",name="Ghent",slotType="university"},{id="bruges",name="Bruges",slotType="resort"},
+            {id="liege",name="Liege",slotType="industrial"},
+        },
+        crisisFlavorTags={"eu_regulatory_changes","political_complexity","logistics_disruption"},
+        specialBonus=nil, notes="EU HQ — Policy Windfall opportunity events more frequent.",
+    },
+
+    portugal = {
+        displayName="Portugal", flagAssetId="rbxassetid://0",
+        tier=5, unlockRevenue=75000000, unlockCost=8000000, wealthMult=1.1,
+        demand={fast_food=1.0,tech=1.3,fashion=1.3,healthcare=1.3,entertainment=1.4,
+                cafe=1.5,fitness=1.4,hotel=1.7,retail=1.3,sports=1.5,
+                automotive=1.1,realestate=1.2,music=1.4,socialmedia=1.4,aerospace=1.1},
+        cities={
+            {id="lisbon",name="Lisbon",slotType="downtown"},{id="porto",name="Porto",slotType="harbor"},
+            {id="algarve",name="Algarve",slotType="resort"},{id="braga",name="Braga",slotType="university"},
+            {id="setubal",name="Setubal",slotType="industrial"},
+        },
+        crisisFlavorTags={"tourism_volatility","brain_drain_crisis","infrastructure_aging"},
+        specialBonus=nil, notes="Algarve Resort strong for Fashion+Entertainment Seasonal.",
+    },
+
+    -- TIER 6
+    ethiopia = {
+        displayName="Ethiopia", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=30000000, wealthMult=0.4,
+        demand={fast_food=1.6,tech=0.6,fashion=0.7,healthcare=0.8,entertainment=0.8,
+                cafe=1.2,fitness=0.6,hotel=0.9,retail=1.1,sports=1.2,
+                automotive=0.5,realestate=0.4,music=1.1,socialmedia=1.0,aerospace=0.5},
+        cities={
+            {id="addis_ababa",name="Addis Ababa",slotType="mall"},{id="dire_dawa",name="Dire Dawa",slotType="industrial"},
+            {id="bahir_dar",name="Bahir Dar",slotType="downtown"},{id="hawassa",name="Hawassa",slotType="university"},
+            {id="adama",name="Adama",slotType="airport"},
+        },
+        crisisFlavorTags={"infrastructure_failure","political_instability","drought_events"},
+        specialBonus=nil, notes="Massive population, very low wealth. Fast Food volume but thin margins.",
+    },
+
+    peru = {
+        displayName="Peru", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=32000000, wealthMult=0.7,
+        demand={fast_food=1.4,tech=0.9,fashion=1.2,healthcare=1.1,entertainment=1.3,
+                cafe=1.3,fitness=1.1,hotel=1.4,retail=1.2,sports=1.5,
+                automotive=0.9,realestate=0.8,music=1.3,socialmedia=1.3,aerospace=0.7},
+        cities={
+            {id="lima",name="Lima",slotType="downtown"},{id="cusco",name="Cusco",slotType="resort"},
+            {id="arequipa",name="Arequipa",slotType="industrial"},{id="trujillo",name="Trujillo",slotType="mall"},
+            {id="piura",name="Piura",slotType="harbor"},
+        },
+        crisisFlavorTags={"political_instability","mining_strikes","infrastructure_gaps"},
+        specialBonus={cityId="cusco", bonusType="entertainment_seasonal", bonusValue=0.20},
+        notes="Cusco Resort Machu Picchu Tourism Boost +20% Entertainment Seasonal.",
+    },
+
+    new_zealand = {
+        displayName="New Zealand", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=40000000, wealthMult=1.4,
+        demand={fast_food=1.2,tech=1.3,fashion=1.1,healthcare=1.6,entertainment=1.4,
+                cafe=1.5,fitness=1.5,hotel=1.6,retail=1.3,sports=1.5,
+                automotive=1.3,realestate=1.4,music=1.3,socialmedia=1.4,aerospace=1.2},
+        cities={
+            {id="auckland",name="Auckland",slotType="harbor"},{id="wellington",name="Wellington",slotType="downtown"},
+            {id="christchurch",name="Christchurch",slotType="mall"},{id="queenstown",name="Queenstown",slotType="resort"},
+            {id="hamilton",name="Hamilton",slotType="university"},
+        },
+        crisisFlavorTags={"earthquake_events","isolation_logistics","environmental_protests"},
+        specialBonus={cityId="queenstown", bonusType="quality_decay_reduction", bonusValue=0.50},
+        notes="Queenstown Resort: quality decays 50% slower (highest base quality retention in game).",
+    },
+
+    greece = {
+        displayName="Greece", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=35000000, wealthMult=1.0,
+        demand={fast_food=1.1,tech=1.0,fashion=1.3,healthcare=1.2,entertainment=1.6,
+                cafe=1.5,fitness=1.3,hotel=1.8,retail=1.3,sports=1.5,
+                automotive=1.0,realestate=1.1,music=1.4,socialmedia=1.3,aerospace=0.9},
+        cities={
+            {id="athens",name="Athens",slotType="downtown"},{id="thessaloniki",name="Thessaloniki",slotType="harbor"},
+            {id="crete",name="Crete",slotType="resort"},{id="mykonos",name="Mykonos",slotType="luxury"},
+            {id="patras",name="Patras",slotType="industrial"},
+        },
+        crisisFlavorTags={"economic_volatility","political_protests","tourism_seasonality"},
+        specialBonus={cityId="mykonos", bonusType="fashion_seasonal", bonusValue=0.30},
+        notes="Mykonos Luxury: highest seasonal bonus in game for Fashion (+30% during events).",
+    },
+
+    romania = {
+        displayName="Romania", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=30000000, wealthMult=0.8,
+        demand={fast_food=1.3,tech=1.4,fashion=1.0,healthcare=1.2,entertainment=1.0,
+                cafe=1.3,fitness=1.2,hotel=1.2,retail=1.2,sports=1.3,
+                automotive=1.1,realestate=1.0,music=1.2,socialmedia=1.4,aerospace=1.1},
+        cities={
+            {id="bucharest",name="Bucharest",slotType="downtown"},{id="cluj",name="Cluj-Napoca",slotType="tech_campus"},
+            {id="timisoara",name="Timisoara",slotType="industrial"},{id="iasi",name="Iasi",slotType="university"},
+            {id="constanta",name="Constanta",slotType="harbor"},
+        },
+        crisisFlavorTags={"political_uncertainty","infrastructure_gaps","eu_compliance_costs"},
+        specialBonus=nil, notes="Cluj-Napoca Tech Campus: hidden gem for Tech in Tier 6.",
+    },
+
+    czech_republic = {
+        displayName="Czech Republic", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=32000000, wealthMult=1.1,
+        demand={fast_food=1.2,tech=1.4,fashion=1.1,healthcare=1.3,entertainment=1.2,
+                cafe=1.4,fitness=1.3,hotel=1.4,retail=1.3,sports=1.3,
+                automotive=1.2,realestate=1.1,music=1.2,socialmedia=1.3,aerospace=1.2},
+        cities={
+            {id="prague",name="Prague",slotType="downtown"},{id="brno",name="Brno",slotType="university"},
+            {id="ostrava",name="Ostrava",slotType="industrial"},{id="plzen",name="Plzen",slotType="mall"},
+            {id="liberec",name="Liberec",slotType="airport"},
+        },
+        crisisFlavorTags={"regulatory_compliance","labor_cost_increases","supply_chain_disruption"},
+        specialBonus=nil, notes="Prague Downtown tourism bonus for Entertainment. Good all-rounder.",
+    },
+
+    ukraine = {
+        displayName="Ukraine", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=28000000, wealthMult=0.6,
+        demand={fast_food=1.3,tech=1.5,fashion=0.9,healthcare=1.1,entertainment=1.0,
+                cafe=1.3,fitness=1.1,hotel=1.1,retail=1.2,sports=1.3,
+                automotive=0.9,realestate=0.7,music=1.2,socialmedia=1.4,aerospace=1.3},
+        cities={
+            {id="kyiv",name="Kyiv",slotType="downtown"},{id="lviv",name="Lviv",slotType="university"},
+            {id="odessa",name="Odessa",slotType="harbor"},{id="kharkiv",name="Kharkiv",slotType="tech_campus"},
+            {id="dnipro",name="Dnipro",slotType="industrial"},
+        },
+        crisisFlavorTags={"geopolitical_instability_high","infrastructure_damage","logistics_breakdown"},
+        specialBonus=nil, notes="High risk. Kharkiv Tech Campus strong for Tech. Cheapest Tier 6 unlock.",
+    },
+
+    kazakhstan = {
+        displayName="Kazakhstan", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=35000000, wealthMult=0.8,
+        demand={fast_food=1.4,tech=1.0,fashion=0.9,healthcare=1.1,entertainment=1.0,
+                cafe=1.3,fitness=1.1,hotel=1.2,retail=1.2,sports=1.3,
+                automotive=1.0,realestate=0.9,music=1.0,socialmedia=1.2,aerospace=1.2},
+        cities={
+            {id="almaty",name="Almaty",slotType="downtown"},{id="nur_sultan",name="Nur-Sultan",slotType="airport"},
+            {id="shymkent",name="Shymkent",slotType="mall"},{id="aktau",name="Aktau",slotType="harbor"},
+            {id="karaganda",name="Karaganda",slotType="industrial"},
+        },
+        crisisFlavorTags={"political_instability","oil_price_impact","infrastructure_gaps"},
+        specialBonus={cityId="nur_sultan", bonusType="all_income", bonusValue=0.10},
+        notes="Nur-Sultan Airport Silk Road Hub bonus +10% all income.",
+    },
+
+    sri_lanka = {
+        displayName="Sri Lanka", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=30000000, wealthMult=0.5,
+        demand={fast_food=1.3,tech=0.9,fashion=1.4,healthcare=1.0,entertainment=1.3,
+                cafe=1.4,fitness=1.0,hotel=1.5,retail=1.2,sports=1.3,
+                automotive=0.7,realestate=0.6,music=1.2,socialmedia=1.3,aerospace=0.5},
+        cities={
+            {id="colombo",name="Colombo",slotType="harbor"},{id="kandy",name="Kandy",slotType="resort"},
+            {id="negombo",name="Negombo",slotType="mall"},{id="jaffna",name="Jaffna",slotType="downtown"},
+            {id="galle",name="Galle",slotType="university"},
+        },
+        crisisFlavorTags={"economic_crisis","political_instability","tourism_disruption"},
+        specialBonus=nil, notes="Fashion higher than expected (textile manufacturing heritage).",
+    },
+
+    myanmar = {
+        displayName="Myanmar", flagAssetId="rbxassetid://0",
+        tier=6, unlockRevenue=500000000, unlockCost=28000000, wealthMult=0.4,
+        demand={fast_food=1.5,tech=0.6,fashion=1.1,healthcare=0.7,entertainment=0.8,
+                cafe=1.1,fitness=0.7,hotel=1.0,retail=1.2,sports=1.1,
+                automotive=0.5,realestate=0.4,music=0.9,socialmedia=1.0,aerospace=0.4},
+        cities={
+            {id="yangon",name="Yangon",slotType="mall"},{id="mandalay",name="Mandalay",slotType="downtown"},
+            {id="naypyidaw",name="Naypyidaw",slotType="airport"},{id="bago",name="Bago",slotType="industrial"},
+            {id="mawlamyine",name="Mawlamyine",slotType="harbor"},
+        },
+        crisisFlavorTags={"political_instability_very_high","sanctions_risk","infrastructure_failure"},
+        specialBonus=nil, notes="Cheapest + highest risk Tier 6. Fast Food volume if crises managed.",
+    },
+
+    -- ================================================================
+    -- HOW TO ADD A NEW COUNTRY:
+    -- 1. Copy any block above that matches your target tier
+    -- 2. Set a unique key (e.g. "ireland") — lowercase, no spaces
+    -- 3. Upload flag image as Roblox Decal, paste asset ID into flagAssetId
+    -- 4. Set tier, unlockRevenue, unlockCost, wealthMult
+    -- 5. Fill demand for all 15 industry IDs (missing keys default to 1.0)
+    -- 6. List 3-7 cities each with unique id, name, and slotType from CityConfig
+    -- 7. OPTIONAL: set specialBonus for a unique city-level bonus
+    -- 8. In WorldMapClient, add: countryPositions["ireland"] = Vector2.new(x, y)
+    -- GameRegistry reads this automatically. Zero service code changes.
+    -- ================================================================
+}
+```
+
+---
+
+## 22.5 Config File: CityConfig
+
+```
+Path: ReplicatedStorage/Config/CityConfig
+Defines what each slot TYPE does. Individual cities reference these types in CountryConfig.
+```
+
+```lua
+-- ReplicatedStorage/Config/CityConfig.lua
+return {
+
+    airport = {
+        displayName             = "Airport",
+        allIncomeBonus          = 0.08,   -- +8% all income
+        offlineBonus            = 0.05,   -- +5% offline income on top of base
+        moraleDecayMult         = 1.0,
+        validIndustries         = "all",  -- "all" means every industry ID is valid
+    },
+
+    mall = {
+        displayName             = "Mall",
+        volumeIncomeBonus       = 0.06,   -- +6% Volume path income
+        allIncomeBonus          = 0.03,   -- +3% all income
+        moraleDecayMult         = 0.90,   -- morale decays 10% slower (pleasant environment)
+        validIndustries         = {
+            "fast_food","tech","fashion","healthcare","entertainment",
+            "cafe","fitness","hotel","retail","automotive","realestate","music","socialmedia",
+        },
+    },
+
+    downtown = {
+        displayName             = "Downtown",
+        allIncomeBonus          = 0.05,
+        brandGainMult           = 1.05,   -- brand score gained 5% faster from all sources
+        validIndustries         = "all",
+    },
+
+    luxury = {
+        displayName             = "Luxury District",
+        premiumIncomeBonus      = 0.25,   -- +25% Premium path income
+        qualityCrisisImmune     = true,   -- immune to quality-based reputation crises
+        validIndustries         = {
+            "fast_food","tech","fashion","healthcare","entertainment",
+            "cafe","fitness","hotel","retail","automotive","realestate","music","socialmedia",
+        },
+    },
+
+    resort = {
+        displayName             = "Resort",
+        seasonalMultBonus       = 0.50,   -- adds +50% to the Seasonal path event multiplier
+        entertainmentBonus      = 0.10,   -- +10% entertainment/sports/hotel income always
+        validIndustries         = {
+            "fast_food","tech","fashion","healthcare","entertainment",
+            "cafe","fitness","hotel","retail","sports","automotive","realestate","music","socialmedia",
+        },
+    },
+
+    industrial = {
+        displayName             = "Industrial",
+        overheadReduction       = 0.15,   -- branch overhead cost -15%
+        volumeIncomeBonus       = 0.10,   -- +10% Volume path income
+        validIndustries         = "all",  -- valid for ALL including Aerospace
+    },
+
+    university = {
+        displayName             = "University",
+        hireCostReduction       = 0.15,   -- staff hire cost -15% at this branch
+        rdSpeedBonusPerSlot     = 0.10,   -- +10% R&D speed per University slot owned globally
+        validIndustries         = {
+            "fast_food","tech","fashion","healthcare","entertainment",
+            "cafe","fitness","hotel","retail","sports","automotive","realestate","music","socialmedia",
+        },
+    },
+
+    harbor = {
+        displayName             = "Harbor",
+        offlineBonus            = 0.10,   -- +10% offline income
+        allIncomeBonus          = 0.05,
+        supplyChainCrisisReductionChance = 0.10, -- -10% chance of supply chain crises
+        validIndustries         = {
+            "fast_food","tech","fashion","healthcare","entertainment",
+            "cafe","fitness","hotel","retail","automotive","realestate","music","socialmedia",
+        },
+    },
+
+    tech_campus = {
+        displayName             = "Tech Campus",
+        techIncomeBonus         = 0.20,   -- +20% income for tech/socialmedia/aerospace/fitness/realestate
+        rdSpeedBonus            = 0.15,   -- +15% R&D speed (flat, not per-slot)
+        validIndustries         = {"tech","socialmedia","aerospace","fitness","realestate"},
+    },
+
+    entertainment_district = {
+        displayName             = "Entertainment District",
+        entertainmentIncomeBonus= 0.20,   -- +20% entertainment/music income
+        seasonalMultBonus       = 0.10,   -- +10% Seasonal multiplier
+        viralEventChanceBonus   = 0.25,   -- viral opportunity events 25% more frequent
+        validIndustries         = {"entertainment","music"},
+    },
+
+    -- ================================================================
+    -- HOW TO ADD A NEW CITY SLOT TYPE:
+    -- 1. Add a new key block here (e.g. "spaceport")
+    -- 2. Define bonus fields — BranchService reads any field you define here
+    -- 3. Set validIndustries: "all" or a table of industry ID strings
+    -- 4. Reference it in CountryConfig cities via slotType = "spaceport"
+    -- BranchService.getCityBonus() reads this automatically.
+    -- ================================================================
+}
+```
+
+---
+
+## 22.6 Config File: StaffConfig
+
+```
+Path: ReplicatedStorage/Config/StaffConfig
+To add a new specialty: add one block. dropWeight controls roll probability:
+high=~25% medium=~12% low_medium=~8% low=~4% very_low=~2%
+```
+
+```lua
+-- ReplicatedStorage/Config/StaffConfig.lua
+return {
+
+    promotionLevels = {
+        [1] = {cost=0,      specialtyMult=1.0, branchCoverageMax=1, moraleFloor=0,  canQuit=true,  abilities={}},
+        [2] = {cost=5000,   specialtyMult=1.3, branchCoverageMax=2, moraleFloor=0,  canQuit=true,  abilities={"cover_2_branches"}},
+        [3] = {cost=25000,  specialtyMult=1.6, branchCoverageMax=2, moraleFloor=20, canQuit=true,  abilities={"cover_2_branches","morale_floor_20"}},
+        [4] = {cost=100000, specialtyMult=2.0, branchCoverageMax=3, moraleFloor=20, canQuit=false, abilities={"cover_3_branches","morale_floor_20","quit_protected"}},
+    },
+
+    hireCosts = {
+        baseHireCost   = 2000,
+        severanceCosts = {[1]=1000, [2]=2500, [3]=8000, [4]=25000},
+    },
+
+    morale = {
+        startingMorale       = 80,
+        maxMorale            = 100,
+        decayIntervalSeconds = 600,
+        baseDecayAmount      = 2,
+        lowQualityExtra      = 1,
+        activeCrisisExtra    = 1,
+        unresolvedCrisisExtra= 2,
+        quitGraceSeconds     = 600,
+        warnThreshold        = 10,
+        moraleBonusCostPerStaff = 500,
+    },
+
+    transfer = {
+        cooldownSeconds   = 300,
+        bonusHalvedDuring = true,
+    },
+
+    specialties = {
+
+        sales_expert = {
+            displayName = "Sales Expert",
+            description = "Directly increases branch revenue from all customers.",
+            dropWeight  = "high", unlockRevenue = 0,
+            bonuses = { revenueBonus = {0.12, 0.18, 0.25, 0.35} },
+            synergy = "Volume path. Best in high-traffic branches.",
+        },
+        cost_cutter = {
+            displayName = "Cost Cutter",
+            description = "Reduces branch overhead cost, increasing net income.",
+            dropWeight  = "high", unlockRevenue = 0,
+            bonuses = { overheadReduction = {0.10, 0.15, 0.22, 0.30} },
+            synergy = "Healthcare, Hotel, Fitness. Any high-overhead branch.",
+        },
+        morale_booster = {
+            displayName = "Morale Booster",
+            description = "Prevents and reverses staff morale decay in this branch.",
+            dropWeight  = "medium", unlockRevenue = 0,
+            bonuses = {
+                decayMultiplier    = {0.5, 0.0, 0.0, 0.0},
+                moraleRegenPerHour = {0,   0,   1,   2},
+                regionalEffect     = {false, false, false, true},
+            },
+            synergy = "Any branch with multiple staff. Stacks with Employee Wellness R&D.",
+        },
+        speed_demon = {
+            displayName = "Speed Demon",
+            description = "Boosts Volume path customer throughput. No effect on Premium or Seasonal.",
+            dropWeight  = "medium", unlockRevenue = 0, pathRestriction = "volume",
+            bonuses = { volumeThroughput = {0.15, 0.22, 0.30, 0.40} },
+            synergy = "Volume path only. Airport and Mall city slots.",
+        },
+        recruiter = {
+            displayName = "Recruiter",
+            description = "Reduces the cost of hiring new staff at this branch.",
+            dropWeight  = "medium", unlockRevenue = 0,
+            bonuses = {
+                hireCostReduction        = {0.20, 0.30, 0.40, 0.50},
+                globalSeveranceReduction = {0,    0,    0,    0.10},
+            },
+            synergy = "Branches you are actively building out.",
+        },
+        quality_inspector = {
+            displayName = "Quality Inspector",
+            description = "Slows quality decay and provides passive quality recovery.",
+            dropWeight  = "medium", unlockRevenue = 0,
+            bonuses = {
+                qualityDecayReduction = {0.30, 0.50, 0.70, 0.80},
+                qualityRegenPerHour   = {0,    0,    0.3,  0.5},
+            },
+            synergy = "Premium path. Luxury and Resort slots. Hotel industry.",
+        },
+        trainer = {
+            displayName = "Trainer",
+            description = "Reduces promotion costs for all staff in this branch.",
+            dropWeight  = "low", unlockRevenue = 5000000,
+            bonuses = {
+                promotionCostReduction = {0.25, 0.35, 0.50, 0.50},
+                l4InstantPromo         = {false, false, false, true},
+            },
+            synergy = "Any branch where you are actively leveling the team.",
+        },
+        negotiator = {
+            displayName = "Negotiator",
+            description = "Reduces expansion costs in the same country.",
+            dropWeight  = "low", unlockRevenue = 0,
+            bonuses = {
+                countryOpenCostReduction = {0.15, 0.20, 0.20, 0.25},
+                countryUnlockReduction   = {0,    0,    0.10, 0},
+                globalExpansionReduction = {0,    0,    0,    0.25},
+            },
+            synergy = "Countries you are expanding heavily into.",
+        },
+        crisis_manager = {
+            displayName = "Crisis Manager",
+            description = "Reduces damage from crises affecting this branch.",
+            dropWeight  = "low", unlockRevenue = 0,
+            bonuses = {
+                crisisDamageReduction = {0.25, 0.40, 0.50, 0.60},
+                crisisWindowExtension = {0,    0,    120,  120},
+            },
+            synergy = "High-crisis countries: Nigeria, Russia, Bangladesh, Argentina, Myanmar.",
+        },
+        data_analyst = {
+            displayName = "Data Analyst",
+            description = "Increases all income from this branch and provides strategic intel.",
+            dropWeight  = "low", unlockRevenue = 25000000,
+            bonuses = {
+                allIncomeBonus          = {0.08, 0.12, 0.15, 0.20},
+                revealNextBoardDecision = {false, false, true, true},
+                contractSpeedBonus      = {0,     0,    0,    0.10},
+            },
+            synergy = "Tech, Social Media industries. Any high-income branch.",
+        },
+        social_media_manager = {
+            displayName = "Social Media Manager",
+            description = "Generates passive brand score and reduces PR crisis chance.",
+            dropWeight  = "low_medium", unlockRevenue = 0,
+            bonuses = {
+                passiveBrandPerMonth = {3, 5, 7, 10},
+                prCrisisReduction    = {0, 0, 0.30, 0.30},
+                globalSMMAtL4        = true,
+            },
+            synergy = "Fashion, Entertainment, Music, Social Media industries.",
+        },
+        logistics_expert = {
+            displayName = "Logistics Expert",
+            description = "Significantly boosts offline income for this branch.",
+            dropWeight  = "low_medium", unlockRevenue = 0,
+            bonuses = {
+                offlineIncomeBonus  = {0.15, 0.22, 0.30, 0.40},
+                regionalOfflineAtL4 = true,
+            },
+            synergy = "Real Estate industry. Players who log in infrequently.",
+        },
+        customer_relations = {
+            displayName = "Customer Relations",
+            description = "Increases investor contract rewards and generates extra contract slots.",
+            dropWeight  = "low_medium", unlockRevenue = 0,
+            bonuses = {
+                contractRewardBonus    = {0.10, 0.18, 0.25, 0.35},
+                extraContractSlotEvery = {0,    0,    2,    2},
+            },
+            synergy = "Contract-focused playstyle.",
+        },
+        finance_wizard = {
+            displayName = "Finance Wizard",
+            description = "Boosts stock dividends and provides market intelligence.",
+            dropWeight  = "very_low", unlockRevenue = 0,
+            bonuses = {
+                dividendBonus            = {0.12, 0.20, 0.30, 0.40},
+                stockBuyCostReduction    = {0,    0.05, 0.05, 0.05},
+                crashWarningEarlySeconds = {0,    0,    180,  180},
+                crashImmunityPerSeason   = {0,    0,    0,    1},
+            },
+            synergy = "Stock market-focused players.",
+        },
+        innovation_lead = {
+            displayName = "Innovation Lead",
+            description = "Accelerates all research and strengthens completed R&D bonuses.",
+            dropWeight  = "very_low", unlockRevenue = 0,
+            bonuses = {
+                extraRdVisible       = {1,     1,     1,    1},
+                rdTimeReduction      = {0,     0.15,  0.25, 0.35},
+                rdBonusStrengthBonus = {0,     0,     0,    0.10},
+                previewRdBonus       = {false, false, true, true},
+            },
+            synergy = "R&D-heavy builds. Pairs with CTO. Social Media industry.",
+        },
+
+        -- ================================================================
+        -- HOW TO ADD A NEW SPECIALTY:
+        -- 1. Add a new key block here with displayName, description, dropWeight, unlockRevenue
+        -- 2. Define bonuses as arrays [L1, L2, L3, L4]
+        -- 3. In StaffService.ApplySpecialtyBonus(), add a case for your specialty key
+        -- The hire system automatically includes it weighted by dropWeight.
+        -- ================================================================
+    },
+}
+```
+
+---
+
+## 22.7 Config File: ExecConfig
+
+```
+Path: ReplicatedStorage/Config/ExecConfig
+4 roles, 3 tiers each. Replacing an exec costs new hire cost + 20% severance of the old one.
+```
+
+```lua
+-- ReplicatedStorage/Config/ExecConfig.lua
+return {
+
+    coo = {
+        displayName = "COO", fullName = "Chief Operating Officer",
+        focus = "Operations, quality decay, overhead reduction",
+        iconKey = "Exec.COO", unlockRevenue = 0,
+        tiers = {
+            [1] = {cost=50000,   displayName="Junior COO", overheadReduction=0.10, qualityDecayMult=0.70,
+                   renovationDiscount=0.10, branchOpenDiscount=0, quitChanceReduction=0, unlocks={}},
+            [2] = {cost=200000,  displayName="Senior COO", overheadReduction=0.18, qualityDecayMult=0.50,
+                   renovationDiscount=0.20, branchOpenDiscount=0.10, quitChanceReduction=0,
+                   unlocks={"board_operational_excellence"}},
+            [3] = {cost=1000000, displayName="Elite COO",  overheadReduction=0.28, qualityDecayMult=0.30,
+                   renovationDiscount=0.35, renovationQualityCap=110, branchOpenDiscount=0.20,
+                   quitChanceReduction=0.25, unlocks={"board_zero_defect_protocol"}},
+        },
+    },
+
+    cmo = {
+        displayName = "CMO", fullName = "Chief Marketing Officer",
+        focus = "Brand score, demand amplification, PR",
+        iconKey = "Exec.CMO", unlockRevenue = 0,
+        tiers = {
+            [1] = {cost=50000,   displayName="Junior CMO", brandScoreCap=110, brandOnHire=5,
+                   demandMultiplier=0.08, prCampaignCooldown=129600, prCampaignCost=500000,
+                   celebrityEventMult=1.0, unlocks={"pr_campaign_board_action"}},
+            [2] = {cost=200000,  displayName="Senior CMO", brandScoreCap=120, brandOnHire=8,
+                   demandMultiplier=0.15, prCampaignCooldown=86400, prCampaignCost=350000,
+                   celebrityEventMult=1.30, unlocks={"board_market_domination"}},
+            [3] = {cost=1000000, displayName="Elite CMO",  brandScoreCap=130, brandOnHire=12,
+                   demandMultiplier=0.25, prCampaignCooldown=57600, prCampaignCost=200000,
+                   brandGainMult=1.50, viralEventMult=1.50, celebrityEventMult=1.50,
+                   unlocks={"brand_legend_status"}},
+        },
+    },
+
+    cfo = {
+        displayName = "CFO", fullName = "Chief Financial Officer",
+        focus = "Offline income cap, contracts, financial stability",
+        iconKey = "Exec.CFO", unlockRevenue = 0,
+        tiers = {
+            [1] = {cost=50000,   displayName="Junior CFO", offlineCap=43200, contractRewardBonus=0.20,
+                   stockCommissionDiscount=0.10, crashCashImpactReduce=0.10, contractSlots=3,
+                   unlocks={"board_financial_hedge"}},
+            [2] = {cost=200000,  displayName="Senior CFO", offlineCap=64800, contractRewardBonus=0.35,
+                   stockCommissionDiscount=0.20, crashCashImpactReduce=0.20, contractSlots=4,
+                   unlocks={"board_debt_leverage"}},
+            [3] = {cost=1000000, displayName="Elite CFO",  offlineCap=86400, contractRewardBonus=0.50,
+                   stockCommissionDiscount=0.35, crashCashImpactReduce=0.40, contractSlots=5,
+                   dividendBonus=0.25, ipoLegacyBonus=0.15, unlocks={"ipo_advantage"}},
+        },
+    },
+
+    cto = {
+        displayName = "CTO", fullName = "Chief Technology Officer",
+        focus = "R&D speed, tech and digital industry income",
+        iconKey = "Exec.CTO", unlockRevenue = 5000000,
+        tiers = {
+            [1] = {cost=50000,   displayName="Junior CTO", rdSpeedBonus=0.25, rdCostDiscount=0.15,
+                   techIncomeBonus=0.10, universityRdBonus=0, rdSlots=2, unlocks={}},
+            [2] = {cost=200000,  displayName="Senior CTO", rdSpeedBonus=0.50, rdCostDiscount=0.25,
+                   techIncomeBonus=0.20, universityRdBonus=0.10, rdSlots=3, unlocks={"extra_rd_slot"}},
+            [3] = {cost=1000000, displayName="Elite CTO",  rdSpeedBonus=0.75, rdCostDiscount=0.40,
+                   techIncomeBonus=0.30, universityRdBonus=0.15, rdBonusStrengthBonus=0.20, rdSlots=4,
+                   unlocks={"extra_rd_slot","rd_breakthrough_once_per_season"}},
+        },
+    },
+
+    -- ================================================================
+    -- HOW TO ADD A NEW EXECUTIVE ROLE:
+    -- 1. Add a new key block (e.g. "cso" for Chief Strategy Officer)
+    -- 2. Define 3 tiers, each with cost and bonus fields
+    -- 3. In ExecService.ApplyExecBonuses() add handling for the new role key
+    -- 4. In DefaultProfile.lua add the slot: executives = {coo=nil,cmo=nil,cfo=nil,cto=nil,cso=nil}
+    -- 5. In ExecsClient add the key to the display order list
+    -- ================================================================
+}
+```
+
+---
+
+## 22.8 Config File: ResearchConfig
+
+```
+Path: ReplicatedStorage/Config/ResearchConfig
+25 projects. effectType is the key ResearchService.Effects[effectType] looks up.
+```
+
+```lua
+-- ReplicatedStorage/Config/ResearchConfig.lua
+return {
+
+    signature_product = {
+        displayName="Signature Product / Service", category="income", availableFor="all",
+        cost=25000, baseDuration=3600, effectType="income_mult_all", effectValue=0.20,
+        permanent=true, oncePer="season", conflictsWith={"ai_analytics_platform"},
+        industryNames = {
+            fast_food="Secret Recipe Formula", tech="Core Platform V2",
+            fashion="Iconic Signature Line", healthcare="Proprietary Treatment Protocol",
+            entertainment="Flagship IP Launch", cafe="Signature Blend Formula",
+            fitness="Signature Training Program", hotel="White Label Experience Protocol",
+            retail="House Brand Product Line", sports="Championship Training System",
+            automotive="Signature Vehicle Collection", realestate="Signature Development Blueprint",
+            music="Signature Artist Sound", socialmedia="Platform Core Identity",
+            aerospace="Proprietary Launch Architecture",
+        },
+    },
+    loyalty_app = {
+        displayName="Loyalty App", category="staff", availableFor="all",
+        cost=35000, baseDuration=4500, effectType="morale_decay_reduction_global", effectValue=0.30,
+        permanent=true, oncePer="season",
+    },
+    automation_suite = {
+        displayName="Automation Suite", category="operations", availableFor="all",
+        cost=80000, baseDuration=7200, effectType="staff_slot_reduction_all", effectValue=1,
+        permanent=true, oncePer="season",
+    },
+    market_intelligence = {
+        displayName="Market Intelligence", category="strategy", availableFor="all",
+        cost=15000, baseDuration=1800, effectType="reveal_country_demand", effectValue=nil,
+        permanent=true, oncePer="season",
+    },
+    crisis_response_protocol = {
+        displayName="Crisis Response Protocol", category="defense", availableFor="all",
+        cost=45000, baseDuration=4500, effectType="crisis_damage_reduction_all", effectValue=0.40,
+        permanent=true, oncePer="season",
+    },
+    supply_chain_optimization = {
+        displayName="Supply Chain Optimization", category="expansion", availableFor="all",
+        cost=30000, baseDuration=3600, effectType="branch_open_cost_reduction", effectValue=0.15,
+        permanent=true, oncePer="season",
+    },
+    premium_experience_design = {
+        displayName="Premium Experience Design", category="income", availableFor="all",
+        cost=55000, baseDuration=5400, effectType="premium_path_income_bonus", effectValue=0.30,
+        permanent=true, oncePer="season",
+    },
+    viral_marketing_campaign = {
+        displayName="Viral Marketing Campaign", category="brand", availableFor="all",
+        cost=20000, baseDuration=2700, effectType="brand_score_instant", effectValue=25,
+        permanent=false, oncePer="season",
+    },
+    ai_analytics_platform = {
+        displayName="AI Analytics Platform", category="income", availableFor="all",
+        cost=100000, baseDuration=9000, effectType="income_mult_all", effectValue=0.18,
+        permanent=true, oncePer="season", conflictsWith={"signature_product"},
+    },
+    employee_wellness_program = {
+        displayName="Employee Wellness Program", category="staff", availableFor="all",
+        cost=40000, baseDuration=5400, effectType="quit_prevention", effectValue=1,
+        permanent=true, oncePer="season",
+    },
+    green_initiative = {
+        displayName="Green Initiative", category="brand", availableFor="all",
+        cost=35000, baseDuration=4500, effectType="brand_and_contract_bonus",
+        brandBonus=12, contractBonus=0.20, permanent=true, oncePer="season",
+    },
+    mobile_application = {
+        displayName="Mobile Application", category="income", availableFor="all",
+        cost=50000, baseDuration=5400, effectType="income_and_offline",
+        incomeBonus=0.10, offlineCapBonus=7200, permanent=true, oncePer="season",
+    },
+    predictive_maintenance = {
+        displayName="Predictive Maintenance System", category="quality", availableFor="all",
+        cost=30000, baseDuration=3600, effectType="quality_regen_all", effectValue=0.3,
+        permanent=true, oncePer="season",
+    },
+    international_trade_deal = {
+        displayName="International Trade Deal", category="expansion", availableFor="all",
+        cost=120000, baseDuration=10800, effectType="country_unlock_discount_tier",
+        affectedTiers={4,5}, effectValue=0.30, permanent=true, oncePer="season",
+    },
+    customer_satisfaction_score = {
+        displayName="Customer Satisfaction Score System", category="contracts", availableFor="all",
+        cost=25000, baseDuration=2700, effectType="contract_reward_bonus", effectValue=0.20,
+        permanent=true, oncePer="season",
+    },
+    franchise_training_kit = {
+        displayName="Franchise Training Kit", category="staff", availableFor="all",
+        cost=60000, baseDuration=5400, effectType="staff_specialty_strength_all", effectValue=0.20,
+        permanent=true, oncePer="season",
+    },
+    hostile_takeover_prep = {
+        displayName="Hostile Takeover Preparation", category="pvp", availableFor="all",
+        cost=40000, baseDuration=3600, effectType="takeover_success_and_window",
+        successBonus=0.15, windowBonus=180, permanent=true, oncePer="season",
+    },
+    brand_refresh_campaign = {
+        displayName="Brand Refresh Campaign", category="brand", availableFor="all",
+        cost=20000, baseDuration=2400, effectType="brand_refresh",
+        brandBonus=20, decayReductionDays=7, decayReductionMult=0.50,
+        permanent=false, oncePer="season",
+    },
+    global_partnership_network = {
+        displayName="Global Partnership Network", category="expansion", availableFor="all",
+        unlockRevenue=100000000, cost=200000, baseDuration=14400,
+        effectType="global_expansion_and_income", unlockDiscount=0.20, incomePerTier5Plus=0.05,
+        permanent=true, oncePer="season",
+    },
+
+    -- Industry-exclusive projects
+    recipe_innovation = {
+        displayName="Recipe Innovation", category="income", availableFor={"fast_food","cafe"},
+        cost=30000, baseDuration=3600, effectType="income_mult_industry", effectValue=0.20,
+        permanent=true, oncePer="season",
+    },
+    platform_launch = {
+        displayName="Platform Launch", category="income", availableFor={"tech","socialmedia"},
+        cost=75000, baseDuration=7200, effectType="income_mult_industry", effectValue=0.30,
+        permanent=true, oncePer="season",
+    },
+    signature_collection = {
+        displayName="Signature Collection", category="income", availableFor={"fashion"},
+        cost=45000, baseDuration=4800, effectType="fashion_income_and_seasonal",
+        incomeBonus=0.25, seasonalBonus=0.5, permanent=true, oncePer="season",
+    },
+    clinical_excellence_protocol = {
+        displayName="Clinical Excellence Protocol", category="income", availableFor={"healthcare"},
+        cost=80000, baseDuration=6000, effectType="income_and_crisis_immune",
+        incomeBonus=0.25, immuneCrisis="malpractice_claim", permanent=true, oncePer="season",
+    },
+    blockbuster_engine = {
+        displayName="Blockbuster Engine", category="income", availableFor={"entertainment","sports"},
+        cost=60000, baseDuration=5400, effectType="seasonal_boost_and_duration",
+        seasonalBonus=0.35, durationMult=1.20, permanent=true, oncePer="season",
+    },
+    security_fortress = {
+        displayName="Security Fortress", category="defense", availableFor="all",
+        cost=55000, baseDuration=5400,
+        effectByIndustry = {
+            tech        = {type="crisis_immune_set", crises={"data_breach","server_outage"}},
+            socialmedia = {type="crisis_immune_set", crises={"data_breach_catastrophic","platform_outage"}},
+            default     = {type="digital_crisis_reduction", value=0.25},
+        },
+        permanent=true, oncePer="season",
+    },
+    drive_through_ai = {
+        displayName="Drive-Through AI", category="income", availableFor={"fast_food"},
+        cost=40000, baseDuration=5400, effectType="volume_path_throughput_bonus", effectValue=0.25,
+        permanent=true, oncePer="season",
+    },
+    nutrition_partnership = {
+        displayName="Nutrition Partnership", category="brand", availableFor={"fast_food"},
+        cost=35000, baseDuration=4500, effectType="brand_and_crisis_immune",
+        brandBonus=10, immuneCrisis="health_inspection_failure", permanent=true, oncePer="season",
+    },
+    ai_integration = {
+        displayName="AI Integration", category="income", availableFor={"tech"},
+        cost=90000, baseDuration=9000, effectType="income_mult_all", effectValue=0.20,
+        permanent=true, oncePer="season",
+    },
+    influencer_network = {
+        displayName="Influencer Network", category="brand", availableFor={"fashion"},
+        cost=35000, baseDuration=5400, effectType="brand_and_crisis_immune",
+        brandBonus=15, immuneCrisis="influencer_fallout", permanent=true, oncePer="season",
+    },
+    sustainability_push = {
+        displayName="Sustainability Push", category="brand", availableFor={"fashion"},
+        cost=25000, baseDuration=3600, effectType="brand_and_cost_reduction",
+        brandBonus=12, costReduction=0.10, permanent=true, oncePer="season",
+    },
+    digital_health_platform = {
+        displayName="Digital Health Platform", category="income", availableFor={"healthcare"},
+        cost=60000, baseDuration=4500, effectType="volume_path_throughput_bonus", effectValue=0.20,
+        permanent=true, oncePer="season",
+    },
+    specialist_recruitment = {
+        displayName="Specialist Recruitment", category="staff", availableFor={"healthcare"},
+        cost=50000, baseDuration=5400, effectType="staff_specialty_strength_all", effectValue=0.25,
+        permanent=true, oncePer="season",
+    },
+    fan_engagement_platform = {
+        displayName="Fan Engagement Platform", category="income", availableFor={"entertainment"},
+        cost=70000, baseDuration=7200, effectType="income_and_viral_chance",
+        incomeBonus=0.20, viralChanceMult=2.0, permanent=true, oncePer="season",
+    },
+    ip_portfolio = {
+        displayName="IP Portfolio", category="defense", availableFor={"entertainment"},
+        cost=45000, baseDuration=4500, effectType="crisis_immune_set",
+        crises={"copyright_lawsuit"}, permanent=true, oncePer="season",
+    },
+
+    -- ================================================================
+    -- HOW TO ADD A NEW R&D PROJECT:
+    -- 1. Add one block here with a unique key
+    -- 2. Set availableFor: "all" or {table of industry IDs}
+    -- 3. Set effectType to match an existing ResearchService.Effects handler,
+    --    or add a new handler there for a new effect type
+    -- 4. If exclusive: add the key to that industry's exclusiveRD in IndustryConfig
+    -- ================================================================
+}
+```
+
+---
+
+## 22.9 Config File: BalanceConfig
+
+```
+Path: ServerScriptService/ServerConfig/BalanceConfig
+THE ONLY FILE you edit to rebalance the game. Every service reads from here via
+GameRegistry.get("KEY"). AdminService can override any key at runtime, no restart needed.
+```
+
+```lua
+-- ServerScriptService/ServerConfig/BalanceConfig.lua
+return {
+
+    -- TICK RATES (seconds)
+    INCOME_TICK_RATE = 1, CLIENT_SYNC_RATE = 5, AUTO_SAVE_INTERVAL = 60,
+    LEADERBOARD_UPDATE_RATE = 300,
+
+    -- OFFLINE SYSTEM
+    OFFLINE_CAP_DEFAULT = 28800, OFFLINE_CAP_CEO_PASS = 86400,
+    OFFLINE_CAP_HOTEL_BASE = 43200, OFFLINE_MIN_TRIGGER = 300,
+
+    -- INCOME FORMULA
+    -- incomePerHour = baseIncome x levelMult x qualityMult x pathMult x cityBonus
+    --                x countryDemand x wealthMult x brandMult x execBonuses
+    --                x rdBonuses x staffBonuses x legacyMult x boostMult
+    BASE_INCOME_PER_LEVEL = 100,
+    LEVEL_INCOME_MULTIPLIERS = {[1]=1.00,[2]=1.25,[3]=1.55,[4]=1.90,[5]=2.30,[6]=2.80,[7]=3.40,[8]=4.10,[9]=4.95,[10]=6.00},
+    LEVEL_COST_MULTIPLIERS   = {[1]=1.0,[2]=0.8,[3]=1.2,[4]=1.8,[5]=2.7,[6]=4.0,[7]=6.0,[8]=9.0,[9]=13.5,[10]=20.0},
+    QUALITY_INCOME_TIERS = {
+        {minQ=90,maxQ=100,mult=1.20}, {minQ=70,maxQ=89,mult=1.10}, {minQ=50,maxQ=69,mult=1.00},
+        {minQ=30,maxQ=49,mult=0.85}, {minQ=10,maxQ=29,mult=0.70}, {minQ=0,maxQ=9,mult=0.50},
+    },
+    BRAND_INCOME_BASE = 0.5, BRAND_INCOME_RANGE = 0.7, BRAND_PRESTIGE_PER_POINT = 0.005,
+
+    -- BRANCH COSTS
+    TIER_COST_MULTIPLIERS = {[1]=1,[2]=1,[3]=3,[4]=8,[5]=25,[6]=80},
+    RENOVATION_COST_FRACTION = 0.30, RENOVATION_QUALITY_RESTORE = 100, RENOVATION_COO_T3_QUALITY = 110,
+
+    -- QUALITY DECAY
+    QUALITY_DECAY_BASE_PER_HOUR = 1, QUALITY_DECAY_HOTEL_MULT = 2.0,
+    QUALITY_FLOOR = 0, QUALITY_CAP = 100, QUALITY_CAP_COO_T3 = 110,
+    COO_QUALITY_DECAY_MULT = {[1]=0.70,[2]=0.50,[3]=0.30},
+    PREDICTIVE_MAINTENANCE_DECAY_BONUS = 0.20,
+    QUALITY_BRAND_HIGH_THRESHOLD = 80, QUALITY_BRAND_LOW_THRESHOLD = 50,
+    QUALITY_BRAND_HIGH_GAIN = 0.5, QUALITY_BRAND_LOW_LOSS = 1.0,
+
+    -- STAFF / MORALE
+    MORALE_START = 80, MORALE_MAX = 100, MORALE_DECAY_INTERVAL = 600,
+    MORALE_BASE_DECAY = 2, MORALE_LOW_QUALITY_EXTRA = 1, MORALE_CRISIS_EXTRA = 1,
+    MORALE_UNRESOLVED_EXTRA = 2, MORALE_QUIT_GRACE = 600, MORALE_WARN_THRESHOLD = 10,
+    MORALE_BONUS_COST_PER_STAFF = 500, MORALE_BRAND_QUIT_PENALTY = 3,
+    TRANSFER_COOLDOWN = 300, TRANSFER_BONUS_HALVED = true,
+
+    -- UPGRADE PATHS
+    VOLUME_INCOME_PER_STAFF = 0.15, PREMIUM_EXEC_MULT_PER_TIER = 0.40,
+    SEASONAL_BASE_MULT = 3.0, SEASONAL_ENTERTAINMENT = 4.0, SEASONAL_SPORTS = 4.0,
+    SEASONAL_RETAIL_BLACKFRIDAY = 5.0, SEASONAL_BASELINE_INCOME = 0.5,
+
+    -- BRAND SCORE
+    BRAND_START = 50, BRAND_MIN = 0, BRAND_MAX_DEFAULT = 100,
+    BRAND_MAX_CMO_T1 = 110, BRAND_MAX_CMO_T2 = 120, BRAND_MAX_CMO_T3 = 130,
+    BRAND_PR_CAMPAIGN_COST = 500000, BRAND_PR_CAMPAIGN_COOLDOWN = 172800, BRAND_PR_CAMPAIGN_GAIN = 15,
+
+    -- CRISES
+    CRISIS_MIN_INTERVAL = 1800, CRISIS_MAX_INTERVAL = 5400, CRISIS_RESPONSE_WINDOW = 300,
+    CRISIS_IGNORE_WINDOW = 120, CRISIS_SECONDARY_CHANCE = 0.50, CRISIS_SECONDARY_MUSIC = 0.75,
+    CRISIS_SEVERE_THRESHOLD = 0.05,
+
+    -- OPPORTUNITIES
+    OPPORTUNITY_MIN_INTERVAL = 3600, OPPORTUNITY_MAX_INTERVAL = 10800,
+
+    -- SEASONAL EVENTS
+    SEASONAL_RESORT_STACK = 0.50, SEASONAL_ADVANCE_INCOME = 7200,
+
+    -- STOCK MARKET
+    STOCK_TICK_RATE = 60, STOCK_DRIFT_PER_TICK = 0.02, STOCK_MOMENTUM_TRIGGER = 3,
+    STOCK_MOMENTUM_BONUS = 0.005, STOCK_SELL_PRESSURE_THRESHOLD = 0.20, STOCK_SELL_PRESSURE_PENALTY = 0.02,
+    STOCK_MAX_UNITS_PER_PLAYER = 1000,
+    CRASH_MIN_INTERVAL = 1200, CRASH_MAX_INTERVAL = 3000, CRASH_MODERATE_MIN = 3600,
+    CRASH_MODERATE_MAX = 5400, CRASH_MAJOR_PERIOD = 10800, CRASH_WARNING_SECONDS = 300,
+    CRASH_SUDDEN_CHANCE = 0.10,
+    STOCK_LISTING_MIN_NETWORTH = 500000, STOCK_LISTING_FEE_FRACTION = 0.05,
+    STOCK_DIVIDEND_FRACTION = 0.02, STOCK_MAX_SHARES_OUTSTANDING = 0.30, STOCK_DELIST_PREMIUM = 0.10,
+
+    -- INVESTOR CONTRACTS
+    CONTRACT_DURATION = 259200, CONTRACT_SCALE_MULT = 1.50, CONTRACT_CHECK_INTERVAL = 300,
+
+    -- BOARD DECISIONS
+    BOARD_DECISIONS_PER_DAY = 3, BOARD_DECISIONS_PASS = 4, BOARD_REFRESH_HOUR = 0, BOARD_HISTORY_MAX = 20,
+
+    -- HOSTILE TAKEOVERS
+    TAKEOVER_COST_FRACTION = 0.15, TAKEOVER_TOKEN_COST_FRACTION = 0.075,
+    TAKEOVER_BASE_CHANCE = 0.40, TAKEOVER_AI_CHANCE = 0.60, TAKEOVER_COOLDOWN = 86400,
+    TAKEOVER_VULNERABILITY_WINDOW = 86400, TAKEOVER_BRAND_WIN_GAIN = 5, TAKEOVER_BRAND_WIN_LOSS = 15,
+    TAKEOVER_BRAND_FAIL_LOSS = 2, TAKEOVER_BRAND_DEFEND_GAIN = 3,
+
+    -- SEASON & IPO
+    SEASON_DURATION_DAYS = 30, IPO_REVENUE_THRESHOLD = 500000000,
+    IPO_LEGACY_MULT_PER_IPO = 0.10, IPO_LEGACY_MULT_CFO_T3 = 0.15,
+    IPO_BRAND_RESET = 50, IPO_CASH_RESET = 250000,
+
+    -- CORPORATION
+    CORP_MAX_MEMBERS = 2, CORP_LEAVE_COOLDOWN = 86400, CORP_DATASTORE_LOCK_SECONDS = 1,
+
+    -- MARKETPLACE
+    MARKETPLACE_MAX_LISTINGS = 3, MARKETPLACE_DURATION = 259200, MARKETPLACE_FEE_FRACTION = 0.10,
+    MARKETPLACE_MIN_PRICE_FRACTION = 0.50, MARKETPLACE_MAX_PRICE_FRACTION = 3.00,
+
+    -- DEV PRODUCTS
+    BOOST_MULTIPLIER = 2.0, BOOST_DURATION = 7200, BOOST_MAX_STACK = 86400,
+
+    -- RATE LIMITING
+    RATE_LIMIT_ACTIONS = 5, RATE_LIMIT_QUERIES = 10, RATE_LIMIT_BOARD = 2,
+    RATE_LIMIT_TAKEOVER = 1, RATE_LIMIT_TAKEOVER_WINDOW = 30,
+
+    -- SANITY CHECKS
+    CASH_SANITY_TOLERANCE = 1.10, CASH_SANITY_INTERVAL = 30,
+}
+```
+
+---
+
+## 22.10 Config File: BoardConfig
+
+```
+Path: ServerScriptService/ServerConfig/BoardConfig
+65 decisions in the pool. Add one block to the decisions array to add a new decision.
+BoardService.Effects["your_decision_id"] = {[1]=fn,[2]=fn,[3]=fn} is the only code needed.
+The full 65-decision list with all options is documented in Section 11 of this spec.
+Use this Luau structure to encode each one:
+```
+
+```lua
+-- ServerScriptService/ServerConfig/BoardConfig.lua
+return {
+
+    categories = {
+        expansion   = {displayName="Market Expansion",    color="#3B82F6"},
+        hr          = {displayName="Staff & HR",          color="#EC4899"},
+        financial   = {displayName="Financial",           color="#22C55E"},
+        brand       = {displayName="Brand & Marketing",   color="#F59E0B"},
+        operations  = {displayName="Operations",          color="#14B8A6"},
+        competitive = {displayName="Competitive & Events",color="#8B5CF6"},
+    },
+
+    decisions = {
+        -- Example entry (this exact pattern repeats for all 65 decisions in Section 11):
+        {
+            id       = "accelerated_entry",
+            title    = "Accelerated Entry",
+            category = "expansion",
+            text     = "A new market is available ahead of schedule.",
+            options  = {
+                {label="Enter Now",   shortLabel="2x cost early",   effect="enter_2x_cost"},
+                {label="Wait 3 Days", shortLabel="Normal price",    effect="no_change"},
+                {label="Skip Market", shortLabel="Focus elsewhere", effect="no_change"},
+            },
+        },
+        {
+            id       = "union_demand",
+            title    = "Union Demand",
+            category = "hr",
+            text     = "Your staff union is making demands.",
+            options  = {
+                {label="Agree to All", shortLabel="morale+20 cost+$50K/mo", effect="union_agree"},
+                {label="Partial",      shortLabel="morale+8 cost+$20K/mo",  effect="union_partial"},
+                {label="Refuse",       shortLabel="morale-15 30% strike",   effect="union_refuse"},
+            },
+        },
+        {
+            id       = "dividend_payout",
+            title    = "Dividend Payout",
+            category = "financial",
+            text     = "Pay a company dividend to boost brand reputation.",
+            options  = {
+                {label="Large Payout", shortLabel="$100K brand+8", effect="dividend_large"},
+                {label="Small Payout", shortLabel="$30K brand+3",  effect="dividend_small"},
+                {label="No Payout",    shortLabel="Save cash",     effect="no_change"},
+            },
+        },
+        {
+            id       = "celebrity_endorsement",
+            title    = "Celebrity Endorsement",
+            category = "brand",
+            text     = "A celebrity wants to endorse your brand.",
+            options  = {
+                {label="Major Deal",       shortLabel="$80K brand+15 income+12%", effect="celeb_major"},
+                {label="Micro-Influencer", shortLabel="$15K brand+5 income+4%",   effect="celeb_micro"},
+                {label="Decline",          shortLabel="Save money",               effect="no_change"},
+            },
+        },
+        {
+            id       = "quality_overhaul",
+            title    = "Quality Overhaul",
+            category = "operations",
+            text     = "A quality improvement program is available.",
+            options  = {
+                {label="Company-Wide",     shortLabel="$40K all branches +30 quality", effect="qual_all"},
+                {label="Priority Branches",shortLabel="$15K top 3 +40 quality",       effect="qual_top3"},
+                {label="Cheapest Branches",shortLabel="$8K bottom 3 +50 quality",     effect="qual_bottom3"},
+            },
+        },
+        {
+            id       = "hostile_takeover_target",
+            title    = "Hostile Takeover Target",
+            category = "competitive",
+            text     = "You've identified a vulnerable rival.",
+            options  = {
+                {label="Launch Takeover", shortLabel="15% net worth 40-70% chance", effect="takeover_launch"},
+                {label="Wait and Observe",shortLabel="Free next opportunity",       effect="no_change"},
+                {label="Decline",         shortLabel="Not interested",              effect="no_change"},
+            },
+        },
+
+        -- ... continue this exact pattern for the remaining 59 decisions.
+        -- Every decision title, category, text, and option wording is already
+        -- written out in full in Section 11 of this document (all 65, grouped
+        -- by category). Transcribe each into this array format — it is a
+        -- mechanical copy-paste job, not new design work.
+
+        -- ================================================================
+        -- HOW TO ADD A NEW BOARD DECISION:
+        -- 1. Add one block to this array with a unique id
+        -- 2. Set category: expansion / hr / financial / brand / operations / competitive
+        -- 3. Write title, text, and 2-3 options with label, shortLabel, effect
+        -- 4. In BoardService add: BoardEffects["your_id"] = {[1]=fn,[2]=fn,[3]=fn}
+        -- The board pool is unlimited — your decision is automatically included
+        -- in the daily random draw the moment it's in this array.
+        -- ================================================================
+    },
+}
+```
+
+---
+
+## 22.11 Config File: CrisisConfig
+
+```
+Path: ServerScriptService/ServerConfig/CrisisConfig
+All crisis types. Industries reference these IDs in IndustryConfig.crisisPool.
+The full list of all 45+ crises with mild/severe effects is documented in Section 12.
+```
+
+```lua
+-- ServerScriptService/ServerConfig/CrisisConfig.lua
+--
+-- FIELD REFERENCE:
+--   displayName  string  shown in news ticker and crisis alert UI
+--   industry     string  industry ID or "universal"
+--   newsText     string  "[branch]" and "[country]" are replaced at runtime
+--   mild{}       table   effects applied on the mild variant
+--   severe{}     table   effects applied on the severe variant (CRISIS_SEVERE_THRESHOLD chance)
+--
+-- EFFECT FIELDS (use any combination):
+--   incomePenalty  {fraction, durationHours, scope}   scope: "branch"|"country"|"all"
+--   brandPenalty   number          cashFine     number          moraleHit  number
+--   staffQuit      number (count)  branchOfflineMinutes number  branchClosedHours number
+--   demandPenalty  {fraction, durationHours, scope}
+--   overheadIncrease {fraction, durationHours}
+--   forcesBoard    bool            regionalVpQuit bool
+--   escalationTarget string (another crisis ID this can escalate into)
+--   seasonalDelayHours number      seasonalMultHalved bool
+--   cmoEffectivenessHalvedDays number
+
+return {
+
+    -- Fast Food (10) — full effect values documented in Section 12
+    health_inspection_failure = {displayName="Health Inspection Failure", industry="fast_food",
+        newsText="Health inspection failed at [branch].",
+        mild={incomePenalty={fraction=0.20,durationHours=48,scope="branch"}, brandPenalty=5},
+        severe={incomePenalty={fraction=0.40,durationHours=72,scope="branch"}, brandPenalty=15, cashFine=30000}},
+    supply_chain_shortage = {displayName="Supply Chain Shortage", industry="fast_food",
+        newsText="[Ingredient] shortage affects [country] restaurants.",
+        mild={incomePenalty={fraction=0.15,durationHours=24,scope="country"}},
+        severe={incomePenalty={fraction=0.30,durationHours=48,scope="country"}, brandPenalty=5}},
+    food_contamination_scare = {displayName="Food Contamination Scare", industry="fast_food",
+        newsText="Food safety scare hits your brand in [country].",
+        mild={brandPenalty=10, incomePenalty={fraction=0.20,durationHours=48,scope="branch"}},
+        severe={brandPenalty=22, incomePenalty={fraction=0.35,durationHours=72,scope="branch"}, cashFine=50000}},
+    staff_walkout = {displayName="Staff Walkout", industry="fast_food",
+        newsText="Staff at [branch] stage a walkout.",
+        mild={branchOfflineMinutes=30, moraleHit=20},
+        severe={staffQuit=3, moraleHit=30, branchOfflineMinutes=120}},
+    competitor_price_war = {displayName="Competitor Price War", industry="fast_food",
+        newsText="A rival launches aggressive pricing in [country].",
+        mild={demandPenalty={fraction=0.10,durationHours=48,scope="country"}},
+        severe={demandPenalty={fraction=0.20,durationHours=72,scope="country"}, forcesBoard=true}},
+    delivery_delay = {displayName="Delivery Delay", industry="fast_food",
+        newsText="Logistics failure delays supply to [country] branches.",
+        mild={incomePenalty={fraction=0.10,durationHours=24,scope="country"}},
+        severe={incomePenalty={fraction=0.25,durationHours=48,scope="country"}}},
+    equipment_breakdown = {displayName="Equipment Breakdown", industry="fast_food",
+        newsText="Critical equipment failure at [branch].",
+        mild={incomePenalty={fraction=0.25,durationHours=24,scope="branch"}, cashFine=10000},
+        severe={incomePenalty={fraction=0.50,durationHours=48,scope="branch"}, cashFine=25000}},
+    bad_review_viral = {displayName="Viral Bad Review", industry="fast_food",
+        newsText="A viral negative review is spreading about [branch].",
+        mild={brandPenalty=8, incomePenalty={fraction=0.15,durationHours=24,scope="branch"}},
+        severe={brandPenalty=18, incomePenalty={fraction=0.30,durationHours=48,scope="branch"}}},
+    ingredient_price_spike = {displayName="Ingredient Price Spike", industry="fast_food",
+        newsText="Key ingredient costs surge 40%.",
+        mild={overheadIncrease={fraction=0.15,durationHours=48}},
+        severe={overheadIncrease={fraction=0.30,durationHours=72}, forcesBoard=true}},
+    health_department_audit = {displayName="Health Department Audit", industry="fast_food",
+        newsText="Surprise audit by health authority.",
+        mild={incomePenalty={fraction=0.10,durationHours=6,scope="all"}},
+        severe={cashFine=40000, branchClosedHours=4}},
+
+    -- Tech (10)
+    server_outage = {displayName="Server Outage", industry="tech",
+        newsText="Major server outage disrupts service.",
+        mild={incomePenalty={fraction=0.35,durationHours=48,scope="all"}, brandPenalty=8},
+        severe={incomePenalty={fraction=1.00,durationHours=4,scope="all"}, brandPenalty=15}},
+    data_breach = {displayName="Data Breach", industry="tech",
+        newsText="Customer data breach detected.",
+        mild={brandPenalty=15, cashFine=30000, incomePenalty={fraction=0.20,durationHours=72,scope="all"}},
+        severe={brandPenalty=25, cashFine=80000, incomePenalty={fraction=0.40,durationHours=72,scope="all"}}},
+    security_vulnerability = {displayName="Security Vulnerability", industry="tech",
+        newsText="Critical security flaw found in your system.",
+        mild={cashFine=15000, incomePenalty={fraction=0.10,durationHours=24}},
+        severe={cashFine=40000, escalationTarget="data_breach"}},
+    key_engineer_quit = {displayName="Key Engineer Quit", industry="tech",
+        newsText="Top engineer leaves for a competitor.",
+        mild={incomePenalty={fraction=0.10,durationHours=48,scope="branch"}, staffQuit=1},
+        severe={regionalVpQuit=true, incomePenalty={fraction=0.20,durationHours=48}}},
+    product_launch_delay = {displayName="Product Launch Delay", industry="tech",
+        newsText="Product launch delayed by technical issues.",
+        mild={seasonalDelayHours=24}, severe={seasonalMultHalved=true}},
+    competitor_feature_copy = {displayName="Competitor Feature Copy", industry="tech",
+        newsText="Rival copies your flagship feature.",
+        mild={demandPenalty={fraction=0.08,durationHours=48}},
+        severe={demandPenalty={fraction=0.15,durationHours=72,scope="global"}, forcesBoard=true}},
+    regulatory_investigation = {displayName="Regulatory Investigation", industry="tech",
+        newsText="Government investigating your tech practices.",
+        mild={cashFine=25000, incomePenalty={fraction=0.10,durationHours=48}},
+        severe={cashFine=75000, incomePenalty={fraction=0.15,durationHours=720}, brandPenalty=10}},
+    bad_app_review = {displayName="Negative Review Wave", industry="tech",
+        newsText="Flood of negative user reviews.",
+        mild={brandPenalty=8, incomePenalty={fraction=0.15,durationHours=48}},
+        severe={brandPenalty=18, incomePenalty={fraction=0.30,durationHours=72}}},
+    patent_dispute = {displayName="Patent Dispute", industry="tech",
+        newsText="Competitor files patent infringement suit.",
+        mild={cashFine=20000}, severe={cashFine=60000, incomePenalty={fraction=0.05,durationHours=720}}},
+    ai_ethics_controversy = {displayName="AI Ethics Controversy", industry="tech",
+        newsText="Media criticizes your AI practices.",
+        mild={brandPenalty=10, incomePenalty={fraction=0.10,durationHours=24}},
+        severe={brandPenalty=20, cmoEffectivenessHalvedDays=7}},
+
+    -- Fashion, Healthcare, Entertainment (10 each) and all 10 new industries (10 each)
+    -- plus the 5 universal crises follow this exact same {displayName, industry, newsText,
+    -- mild{}, severe{}} structure. The complete effect values for every one of the 45+
+    -- crisis types are written out in full in Section 12 of this document — copy each
+    -- block over in this format. This is a transcription task, not new design work.
+
+    natural_disaster = {displayName="Natural Disaster", industry="universal",
+        newsText="A natural disaster has disrupted operations in [country].",
+        mild={incomePenalty={fraction=0.20,durationHours=48,scope="country"}},
+        severe={incomePenalty={fraction=0.40,durationHours=96,scope="country"}, cashFine=20000}},
+    political_instability = {displayName="Political Instability", industry="universal",
+        newsText="Political instability is disrupting business in [country].",
+        mild={demandPenalty={fraction=0.10,durationHours=72,scope="country"}},
+        severe={demandPenalty={fraction=0.20,durationHours=144,scope="country"}, brandPenalty=5}},
+    currency_devaluation = {displayName="Currency Devaluation", industry="universal",
+        newsText="Currency devaluation reduces revenue in [country].",
+        mild={incomePenalty={fraction=0.15,durationHours=72,scope="country"}},
+        severe={incomePenalty={fraction=0.30,durationHours=144,scope="country"}},
+        emergingMarketsOnly=true},
+    power_outage = {displayName="Power Outage", industry="universal",
+        newsText="Power outages affect operations in [country].",
+        mild={branchOfflineMinutes=45}, severe={branchOfflineMinutes=120, moraleHit=10}},
+    logistics_breakdown = {displayName="Logistics Breakdown", industry="universal",
+        newsText="Global logistics breakdown disrupts supply to your branches.",
+        mild={incomePenalty={fraction=0.10,durationHours=24,scope="country"}},
+        severe={incomePenalty={fraction=0.20,durationHours=48,scope="country"}}},
+
+    -- ================================================================
+    -- HOW TO ADD A NEW CRISIS:
+    -- 1. Add one block with a unique key, displayName, industry, newsText
+    -- 2. Define mild{} and severe{} using any combination of the effect fields above
+    -- 3. Add the key to an industry's crisisPool in IndustryConfig
+    -- EventService applies all fields automatically — no code changes needed
+    -- unless you invent a completely new effect field type.
+    -- ================================================================
+}
+```
+
+---
+
+## 22.12 Config File: OpportunityConfig
+
+```
+Path: ServerScriptService/ServerConfig/OpportunityConfig
+20 opportunity types. The full effect descriptions are in Section 12.
+```
+
+```lua
+-- ServerScriptService/ServerConfig/OpportunityConfig.lua
+return {
+
+    viral_moment           = {displayName="Viral Moment", newsText="Something you did is going viral!",
+        effect={incomeBoostFraction=0.30, durationMinutes=20, brandGain=10}},
+    celebrity_endorsement  = {displayName="Celebrity Endorsement", newsText="A celebrity wants to endorse your brand — for free.",
+        effect={brandGain=12, incomeBoostFraction=0.08, durationHours=48}},
+    government_contract    = {displayName="Government Contract", newsText="Government offers a lucrative supply contract.",
+        effect={cashBonusFractionOfMonthlyIncome=0.30, brandGain=5}},
+    media_feature           = {displayName="Media Feature", newsText="A top media outlet is featuring your company.",
+        effect={brandGain=15, incomeBoostFraction=0.05, durationHours=24}},
+    investor_windfall        = {displayName="Investor Windfall", newsText="An investor has made a generous cash injection.",
+        effect={cashRange={100000,500000}}},
+    competitor_bankruptcy    = {displayName="Competitor Bankruptcy", newsText="A rival company has gone bankrupt in [country].",
+        effect={demandBoostFraction=0.20, durationHours=72, scope="country"}},
+    trade_deal_bonus         = {displayName="Trade Deal Bonus", newsText="A new trade deal opens a 24-hour discount opportunity.",
+        effect={countryUnlockDiscountFraction=0.50, durationHours=24, countries=1}},
+    staff_talent_walkin      = {displayName="Talent Walk-In", newsText="An exceptional candidate has approached your company directly.",
+        effect={freeHire=true, level=2, specialtyRarity="rare"}},
+    industry_event_spike     = {displayName="Industry Event Spike", newsText="Industry excitement is building ahead of the next event.",
+        effect={seasonalBonusBoost=0.50, nextEventOnly=true}},
+    quality_award            = {displayName="Quality Award", newsText="Your company has received a quality excellence award.",
+        effect={brandGain=8, qualityBoostAll=10}},
+    research_breakthrough    = {displayName="Research Breakthrough", newsText="Your R&D team has made an unexpected breakthrough.",
+        effect={completeOneRdInstant=true}},
+    market_expansion_tip     = {displayName="Market Expansion Tip", newsText="Industry insiders reveal the best markets for your industry.",
+        effect={revealBestCountry=true}},
+    merger_interest          = {displayName="Merger Interest", newsText="Another company has expressed serious merger interest.",
+        effect={triggerCorpModePrompt=true}},
+    patent_success            = {displayName="Patent Success", newsText="A patent filing brings unexpected income.",
+        effect={cashBonus=50000, brandGain=5}},
+    community_recognition    = {displayName="Community Recognition", newsText="Local community recognizes your positive impact.",
+        effect={brandGain=10, localBranchIncomeBoost=0.20, durationHours=48}},
+    supply_deal               = {displayName="Supply Deal", newsText="A supplier offers preferential terms in [country].",
+        effect={branchOpenDiscountFraction=0.20, durationDays=7, countries=1}},
+    talent_conference         = {displayName="Talent Conference", newsText="Your company attends an elite recruitment event.",
+        effect={nextNHiresGuaranteedRare=3}},
+    viral_product_launch      = {displayName="Viral Product Launch", newsText="Your latest product is generating massive buzz.",
+        effect={miniSeasonalSpike=true, industries={"entertainment","fashion","music","retail"}}},
+    regulatory_approval       = {displayName="Regulatory Approval", newsText="A regulatory approval opens a new branch slot.",
+        effect={unlockNewBranchSlot=true, industries={"healthcare"}}},
+    funding_round             = {displayName="Funding Round", newsText="Venture capital funding arrives unexpectedly.",
+        effect={cashBonus=200000, industries={"tech","socialmedia"}}},
+
+    -- ================================================================
+    -- HOW TO ADD A NEW OPPORTUNITY EVENT:
+    -- 1. Add one block with a unique key, displayName, newsText, effect{}
+    -- 2. If the effect uses existing fields (cashBonus, brandGain, incomeBoostFraction,
+    --    demandBoostFraction etc.) no code change is needed at all
+    -- 3. If you invent a new effect field, add a case for it in
+    --    EventService.applyOpportunity()
+    -- ================================================================
+}
+```
+
+---
+
+## 22.13 Config File: SeasonalConfig
+
+```
+Path: ServerScriptService/ServerConfig/SeasonalConfig
+12 seasonal events per year. month: 1-12, day: nil means a random date within the month.
+```
+
+```lua
+-- ServerScriptService/ServerConfig/SeasonalConfig.lua
+return {
+
+    holiday_rush = {displayName="Holiday Rush", month=12, day=nil, durationHours=48,
+        newsAnnouncement="HOLIDAY RUSH: The busiest season of the year begins!",
+        multipliers={fast_food=2.5,tech=1.5,fashion=2.0,healthcare=1.2,entertainment=3.5,
+            cafe=2.0,fitness=1.5,hotel=2.5,retail=3.0,sports=2.5,automotive=1.8,
+            realestate=1.3,music=2.0,socialmedia=2.0,aerospace=1.3}},
+    summer_sale = {displayName="Summer Sale", month=7, day=nil, durationHours=36,
+        newsAnnouncement="SUMMER SALE: Shoppers are out in force.",
+        multipliers={fast_food=1.8,tech=1.5,fashion=2.5,healthcare=1.1,entertainment=2.0,
+            cafe=2.2,fitness=1.8,hotel=2.5,retail=2.0,sports=2.0,automotive=1.5,
+            realestate=1.3,music=1.8,socialmedia=1.8,aerospace=1.2}},
+    tech_summit = {displayName="Tech Summit", month=3, day=15, durationHours=24,
+        newsAnnouncement="TECH SUMMIT: The world is watching the industry.",
+        multipliers={fast_food=1.2,tech=3.0,fashion=1.1,healthcare=1.2,entertainment=1.3,
+            cafe=1.3,fitness=1.3,hotel=1.5,retail=1.3,sports=1.2,automotive=1.5,
+            realestate=1.2,music=1.3,socialmedia=3.0,aerospace=2.5}},
+    fashion_week = {displayName="Fashion Week", month=2, day=10, durationHours=24, repeatsMonth=9,
+        newsAnnouncement="FASHION WEEK: All eyes are on the industry.",
+        multipliers={fast_food=1.1,tech=1.0,fashion=3.5,healthcare=1.0,entertainment=1.5,
+            cafe=1.5,fitness=1.3,hotel=1.8,retail=1.8,sports=1.0,automotive=1.2,
+            realestate=1.1,music=2.0,socialmedia=2.0,aerospace=1.0}},
+    health_awareness_month = {displayName="Health Awareness Month", month=10, day=nil, durationHours=72,
+        newsAnnouncement="HEALTH AWARENESS MONTH: Consumer focus on wellness surges.",
+        multipliers={fast_food=0.9,tech=1.1,fashion=1.0,healthcare=2.0,entertainment=1.1,
+            cafe=1.3,fitness=2.5,hotel=1.3,retail=1.1,sports=1.8,automotive=1.0,
+            realestate=1.1,music=1.1,socialmedia=1.4,aerospace=1.1}},
+    entertainment_awards = {displayName="Global Entertainment Awards", month=4, day=20, durationHours=24,
+        newsAnnouncement="ENTERTAINMENT AWARDS: The biggest night in the industry.",
+        multipliers={fast_food=1.2,tech=1.2,fashion=1.5,healthcare=1.0,entertainment=3.0,
+            cafe=1.3,fitness=1.2,hotel=2.0,retail=1.5,sports=2.0,automotive=1.2,
+            realestate=1.1,music=3.5,socialmedia=2.5,aerospace=1.1}},
+    new_year_launch = {displayName="New Year Launch", month=1, day=1, durationHours=24, isUniversal=true,
+        newsAnnouncement="NEW YEAR: Every industry surges with fresh energy.",
+        multipliers={fast_food=1.8,tech=1.8,fashion=1.8,healthcare=1.8,entertainment=1.8,
+            cafe=1.8,fitness=2.5,hotel=1.8,retail=1.8,sports=1.8,automotive=1.8,
+            realestate=1.8,music=1.8,socialmedia=1.8,aerospace=1.8}},
+    back_to_school = {displayName="Back to School", month=8, day=nil, durationHours=24,
+        newsAnnouncement="BACK TO SCHOOL: Students and parents are spending.",
+        multipliers={fast_food=1.6,tech=1.8,fashion=1.5,healthcare=1.2,entertainment=1.5,
+            cafe=2.0,fitness=1.4,hotel=1.3,retail=1.6,sports=1.5,automotive=1.3,
+            realestate=1.2,music=1.5,socialmedia=1.8,aerospace=1.2}},
+    valentines_push = {displayName="Valentine's Push", month=2, day=14, durationHours=12,
+        newsAnnouncement="VALENTINE'S DAY: Romance drives big spending.",
+        multipliers={fast_food=1.5,tech=1.3,fashion=2.0,healthcare=1.2,entertainment=2.0,
+            cafe=2.5,fitness=1.4,hotel=2.0,retail=1.8,sports=1.3,automotive=1.4,
+            realestate=1.2,music=2.5,socialmedia=2.0,aerospace=1.0}},
+    black_friday = {displayName="Black Friday", month=11, day=24, durationHours=24,
+        newsAnnouncement="BLACK FRIDAY: The biggest shopping day of the year.",
+        multipliers={fast_food=2.0,tech=2.0,fashion=2.5,healthcare=1.1,entertainment=1.8,
+            cafe=1.8,fitness=1.5,hotel=1.5,retail=5.0,sports=2.0,automotive=2.0,
+            realestate=1.3,music=2.0,socialmedia=2.5,aerospace=1.2}},
+    world_cup = {displayName="World Cup / Major Sport Event", month=6, day=nil, durationHours=48,
+        newsAnnouncement="WORLD CUP: The planet stops to watch.",
+        multipliers={fast_food=2.5,tech=1.3,fashion=1.5,healthcare=1.3,entertainment=3.0,
+            cafe=2.0,fitness=1.8,hotel=2.5,retail=2.0,sports=4.5,automotive=1.4,
+            realestate=1.3,music=2.0,socialmedia=2.5,aerospace=1.2}},
+    innovation_showcase = {displayName="Innovation Showcase", month=5, day=nil, durationHours=24,
+        newsAnnouncement="INNOVATION SHOWCASE: The future is on display.",
+        multipliers={fast_food=1.2,tech=2.5,fashion=1.2,healthcare=1.5,entertainment=1.5,
+            cafe=1.3,fitness=1.5,hotel=1.4,retail=1.4,sports=1.3,automotive=2.0,
+            realestate=1.3,music=1.5,socialmedia=3.0,aerospace=3.0}},
+
+    -- ================================================================
+    -- HOW TO ADD A NEW SEASONAL EVENT:
+    -- 1. Add one block with month/day, durationHours, multipliers for all 15 industries
+    -- 2. Write a newsAnnouncement string
+    -- SeasonService checks this daily and EventService applies the multipliers
+    -- automatically to all Seasonal path branches — no code changes needed.
+    -- ================================================================
+}
+```
+
+---
+
+## 22.14 Config File: MilestoneConfig
+
+```
+Path: ReplicatedStorage/Config/MilestoneConfig
+Read by MilestoneTracker and OverlayManager. Add an entry to trigger a new Breaking News moment.
+```
+
+```lua
+-- ReplicatedStorage/Config/MilestoneConfig.lua
+return {
+
+    revenueMilestones = {
+        {threshold=100000,        headline="Your company has crossed $100 Thousand in revenue!",        type="revenue"},
+        {threshold=500000,        headline="Mogul Inc. is growing fast — $500K reached!",                type="revenue"},
+        {threshold=1000000,       headline="BREAKING: [Company] crosses the million dollar mark.",        type="revenue"},
+        {threshold=5000000,       headline="Business is booming at [Company] — $5 Million!",             type="revenue"},
+        {threshold=10000000,      headline="[Company] hits $10 Million revenue.",                        type="revenue"},
+        {threshold=50000000,      headline="[Company] is now a $50 Million enterprise.",                 type="revenue"},
+        {threshold=100000000,     headline="BREAKING: [Company] crosses $100 Million.",                   type="revenue"},
+        {threshold=500000000,     headline="IPO threshold reached — [Company] valued at $500M+!",        type="revenue"},
+        {threshold=1000000000,    headline="BREAKING: [Company] is officially a Billionaire.",            type="revenue"},
+        {threshold=5000000000,    headline="[Company] now worth $5 Billion.",                             type="revenue"},
+        {threshold=10000000000,   headline="BREAKING: [Company] crosses $10 Billion.",                    type="revenue"},
+        {threshold=100000000000,  headline="[Company] joins the global elite — $100 Billion!",           type="revenue"},
+        {threshold=1000000000000, headline="HISTORIC: [Company] reaches $1 Trillion. The world takes notice.", type="revenue"},
+    },
+
+    specialMilestones = {
+        {id="first_ipo",           headline="BREAKING: [Company] goes public. A new era begins.",                type="ipo"},
+        {id="subsequent_ipo",      headline="Season [N] IPO complete. Legacy continues.",                        type="ipo"},
+        {id="first_takeover_win",  headline="BREAKING: [Company] acquires a rival company.",                     type="takeover"},
+        {id="first_takeover_def",  headline="BREAKING: [Company] repels a hostile takeover bid.",                type="takeover"},
+        {id="corp_formation",      headline="[CorpName] Corporation is founded. Two giants unite.",              type="social"},
+        {id="rank_1",              headline="[Company] reaches #1 on the leaderboard. The top of the world.",    type="social"},
+        {id="brand_100",           headline="[Company] achieves perfect brand reputation. 100 points.",          type="brand"},
+        {id="brand_legend",        headline="BREAKING: [Company] achieves Global Icon status. Brand score 130.", type="brand"},
+        {id="first_tier6_country", headline="[Company] enters a Tier 6 endgame market. Elite territory.",        type="expansion"},
+        {id="all_execs_t3",        headline="[Company] assembles a world-class executive team. Full T3 lineup.", type="executive"},
+    },
+
+    -- ================================================================
+    -- HOW TO ADD A NEW BREAKING NEWS TRIGGER:
+    -- 1. Add a block to revenueMilestones (numeric threshold) or specialMilestones (event-based)
+    -- 2. MilestoneTracker checks these automatically and fires the BreakingNews RemoteEvent
+    -- ================================================================
+}
+```
+
+---
+
+## 22.15 Config File: IconConfig
+
+```
+Path: ReplicatedStorage/Config/IconConfig
+Read by all client scripts. To add a new icon: upload PNG to Roblox, paste asset ID below.
+```
+
+```lua
+-- ReplicatedStorage/Config/IconConfig.lua
+-- Upload white-on-transparent PNG to Roblox as a Decal, paste the asset ID number here.
+-- Usage: imageLabel.Image = "rbxassetid://" .. IconConfig.Dashboard
+--        imageLabel.ImageColor3 = Color3.fromHex("#22C55E")  -- tint at runtime
+
+return {
+    Dashboard=0, Branches=0, Staff=0, Executives=0, Research=0,
+    StockMarket=0, Board=0, Leaderboard=0, Shop=0, Settings=0,
+
+    Buy=0, Upgrade=0, Hire=0, Fire=0, Promote=0, Transfer=0, Renovate=0,
+    Relocate=0, CloseBranch=0, StartResearch=0, Complete=0, Cancel=0, Back=0,
+    Expand=0, Collapse=0,
+
+    Saving=0, Saved=0, SaveError=0, Bell=0, MoraleHigh=0, MoraleMid=0, MoraleLow=0,
+    Crisis=0, Opportunity=0, Locked=0, Unlocked=0, VIP=0, Boost=0, Offline=0, Online=0,
+
+    Cash=0, Revenue=0, NetWorth=0, BrandScore=0, Quality=0, Morale=0, Country=0,
+    ResearchTimer=0, StockUp=0, StockDown=0, Season=0, Legacy=0, IPO=0, Corp=0,
+    Takeover=0, Dossier=0, News=0,
+
+    Industry = {
+        FastFood=0, Tech=0, Fashion=0, Healthcare=0, Entertainment=0,
+        Cafe=0, Fitness=0, Hotel=0, Retail=0, Sports=0,
+        Automotive=0, RealEstate=0, Music=0, SocialMedia=0, Aerospace=0,
+    },
+
+    Exec = {COO=0, CMO=0, CFO=0, CTO=0},
+
+    Tier = {[1]=0, [2]=0, [3]=0, [4]=0, [5]=0, [6]=0},
+}
+```
+
+---
+
+## 22.16 GameRegistry — Central Config Loader
+
+```
+Path: ServerScriptService/GameRegistry (ModuleScript)
+Required by every Service: local Registry = require(GameRegistry)
+Never require Config files directly inside a Service — always go through GameRegistry.
+```
+
+```lua
+-- ServerScriptService/GameRegistry.lua
+local GameRegistry = {}
+
+local ServerStorage     = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SharedConfig = ReplicatedStorage:WaitForChild("Config")
+local ServerConfig = ServerStorage:WaitForChild("ServerConfig")
+
+GameRegistry.Industries   = require(SharedConfig:WaitForChild("IndustryConfig"))
+GameRegistry.Countries    = require(SharedConfig:WaitForChild("CountryConfig"))
+GameRegistry.Cities       = require(SharedConfig:WaitForChild("CityConfig"))
+GameRegistry.Staff        = require(SharedConfig:WaitForChild("StaffConfig"))
+GameRegistry.Execs        = require(SharedConfig:WaitForChild("ExecConfig"))
+GameRegistry.Research     = require(SharedConfig:WaitForChild("ResearchConfig"))
+GameRegistry.Milestones   = require(SharedConfig:WaitForChild("MilestoneConfig"))
+GameRegistry.Icons        = require(SharedConfig:WaitForChild("IconConfig"))
+
+GameRegistry.Board         = require(ServerConfig:WaitForChild("BoardConfig"))
+GameRegistry.Crises        = require(ServerConfig:WaitForChild("CrisisConfig"))
+GameRegistry.Opportunities = require(ServerConfig:WaitForChild("OpportunityConfig"))
+GameRegistry.Seasonal      = require(ServerConfig:WaitForChild("SeasonalConfig"))
+GameRegistry.Balance       = require(ServerConfig:WaitForChild("BalanceConfig"))
+GameRegistry.Admin         = require(ServerConfig:WaitForChild("AdminConfig"))
+
+-- ============================================================
+-- HELPER LOOKUPS used throughout Services
+-- ============================================================
+function GameRegistry.getIndustry(id)
+    local ind = GameRegistry.Industries[id]
+    assert(ind, "[GameRegistry] Industry not found: " .. tostring(id))
+    return ind
+end
+
+function GameRegistry.getCountry(id)
+    local c = GameRegistry.Countries[id]
+    assert(c, "[GameRegistry] Country not found: " .. tostring(id))
+    return c
+end
+
+function GameRegistry.getCity(countryId, cityId)
+    local country = GameRegistry.getCountry(countryId)
+    for _, city in ipairs(country.cities) do
+        if city.id == cityId then return city end
+    end
+    error("[GameRegistry] City not found: " .. tostring(cityId) .. " in " .. countryId)
+end
+
+function GameRegistry.getCitySlot(slotType)
+    local slot = GameRegistry.Cities[slotType]
+    assert(slot, "[GameRegistry] City slot type not found: " .. tostring(slotType))
+    return slot
+end
+
+function GameRegistry.getStaffSpecialty(id)
+    local s = GameRegistry.Staff.specialties[id]
+    assert(s, "[GameRegistry] Specialty not found: " .. tostring(id))
+    return s
+end
+
+function GameRegistry.getResearchProject(id)
+    local p = GameRegistry.Research[id]
+    assert(p, "[GameRegistry] R&D project not found: " .. tostring(id))
+    return p
+end
+
+function GameRegistry.getExecRole(role)
+    local e = GameRegistry.Execs[role]
+    assert(e, "[GameRegistry] Exec role not found: " .. tostring(role))
+    return e
+end
+
+function GameRegistry.getCrisis(id)
+    local c = GameRegistry.Crises[id]
+    assert(c, "[GameRegistry] Crisis not found: " .. tostring(id))
+    return c
+end
+
+function GameRegistry.getBoardDecision(id)
+    for _, d in ipairs(GameRegistry.Board.decisions) do
+        if d.id == id then return d end
+    end
+    error("[GameRegistry] Board decision not found: " .. tostring(id))
+end
+
+function GameRegistry.getAllIndustryIds()
+    local ids = {}
+    for id in pairs(GameRegistry.Industries) do table.insert(ids, id) end
+    return ids
+end
+
+function GameRegistry.getAllCountryIds()
+    local ids = {}
+    for id in pairs(GameRegistry.Countries) do table.insert(ids, id) end
+    return ids
+end
+
+function GameRegistry.getCountriesByTier(tier)
+    local result = {}
+    for id, country in pairs(GameRegistry.Countries) do
+        if country.tier == tier then table.insert(result, {id=id, data=country}) end
+    end
+    return result
+end
+
+function GameRegistry.isIndustryUnlocked(industryId, profile)
+    local ind = GameRegistry.getIndustry(industryId)
+    if ind.mechanics.unlockRequiresIPO then
+        return profile.season.ipoCount >= 1
+    end
+    return true
+end
+
+function GameRegistry.isCityValidForIndustry(slotType, industryId)
+    local slot = GameRegistry.getCitySlot(slotType)
+    if slot.validIndustries == "all" then return true end
+    for _, id in ipairs(slot.validIndustries) do
+        if id == industryId then return true end
+    end
+    return false
+end
+
+function GameRegistry.getResearchProjectsForIndustry(industryId)
+    local available = {}
+    for projectId, project in pairs(GameRegistry.Research) do
+        if project.availableFor == "all" then
+            table.insert(available, projectId)
+        elseif type(project.availableFor) == "table" then
+            for _, ind in ipairs(project.availableFor) do
+                if ind == industryId then table.insert(available, projectId); break end
+            end
+        end
+    end
+    return available
+end
+
+-- ============================================================
+-- LIVE CONFIG OVERRIDE SYSTEM
+-- AdminService can override any BalanceConfig value at runtime.
+-- Always read numbers via GameRegistry.get("KEY"), never GameRegistry.Balance.KEY directly,
+-- so live overrides take effect everywhere automatically.
+-- ============================================================
+GameRegistry.LiveOverrides = {}
+
+function GameRegistry.get(key)
+    if GameRegistry.LiveOverrides[key] ~= nil then
+        return GameRegistry.LiveOverrides[key]
+    end
+    return GameRegistry.Balance[key]
+end
+
+-- ============================================================
+-- STARTUP VALIDATION
+-- Catches config mistakes early before they cause runtime errors.
+-- ============================================================
+function GameRegistry.validate()
+    local errors = {}
+
+    for id, ind in pairs(GameRegistry.Industries) do
+        if not ind.themeColor then table.insert(errors, id..": missing themeColor") end
+        if not ind.branchName  then table.insert(errors, id..": missing branchName") end
+        if not ind.crisisPool then
+            table.insert(errors, id..": missing crisisPool")
+        elseif #ind.crisisPool ~= 10 then
+            table.insert(errors, id..": crisisPool needs exactly 10 entries, has "..#ind.crisisPool)
+        end
+        if ind.upgradeNames then
+            if not ind.upgradeNames.volume   or #ind.upgradeNames.volume   ~= 5 then table.insert(errors, id..": volume upgradeNames needs 5 entries") end
+            if not ind.upgradeNames.premium  or #ind.upgradeNames.premium  ~= 5 then table.insert(errors, id..": premium upgradeNames needs 5 entries") end
+            if not ind.upgradeNames.seasonal or #ind.upgradeNames.seasonal ~= 5 then table.insert(errors, id..": seasonal upgradeNames needs 5 entries") end
+        else
+            table.insert(errors, id..": missing upgradeNames")
+        end
+        for _, crisisId in ipairs(ind.crisisPool or {}) do
+            if not GameRegistry.Crises[crisisId] then
+                table.insert(errors, id..": crisis '"..crisisId.."' not found in CrisisConfig")
+            end
+        end
+        for _, rdId in ipairs(ind.exclusiveRD or {}) do
+            if not GameRegistry.Research[rdId] then
+                table.insert(errors, id..": R&D project '"..rdId.."' not found in ResearchConfig")
+            end
+        end
+    end
+
+    for id, country in pairs(GameRegistry.Countries) do
+        if not country.tier then table.insert(errors, "country "..id..": missing tier") end
+        if not country.cities or #country.cities == 0 then table.insert(errors, "country "..id..": no cities defined") end
+        for _, city in ipairs(country.cities or {}) do
+            if not GameRegistry.Cities[city.slotType] then
+                table.insert(errors, "country "..id.." city "..city.id..": unknown slotType '"..city.slotType.."'")
+            end
+        end
+    end
+
+    local seenIds = {}
+    for _, d in ipairs(GameRegistry.Board.decisions) do
+        if seenIds[d.id] then table.insert(errors, "BoardConfig: duplicate decision id '"..d.id.."'") end
+        seenIds[d.id] = true
+        if not GameRegistry.Board.categories[d.category] then
+            table.insert(errors, "BoardConfig decision '"..d.id.."': unknown category '"..d.category.."'")
+        end
+        if #d.options < 2 or #d.options > 3 then
+            table.insert(errors, "BoardConfig decision '"..d.id.."': needs 2 or 3 options, has "..#d.options)
+        end
+    end
+
+    if #errors > 0 then
+        for _, err in ipairs(errors) do warn("[GameRegistry VALIDATION ERROR] "..err) end
+        error("[GameRegistry] "..#errors.." config validation error(s). Check output above.")
+    else
+        print("[GameRegistry] All configs validated OK — "
+            ..tostring(#GameRegistry.getAllIndustryIds()).." industries, "
+            ..tostring(#GameRegistry.getAllCountryIds()).." countries, "
+            ..tostring(#GameRegistry.Board.decisions).." board decisions.")
+    end
+end
+
+GameRegistry.validate()
+return GameRegistry
+```
+
+---
+
+## 22.17 Config File: AdminConfig
+
+```
+Path: ServerScriptService/ServerConfig/AdminConfig
+Add or remove admin User IDs here. Get a User ID from roblox.com/users/USERNAME/profile.
+```
+
+```lua
+-- ServerScriptService/ServerConfig/AdminConfig.lua
+return {
+
+    admins = {
+        -- Replace these with your actual Roblox User IDs
+        [1234567890] = "owner",      -- your main account, full access
+        [9876543210] = "moderator",  -- a trusted moderator account
+    },
+
+    permissions = {
+        owner = {
+            "give_cash","view_profile","kick_player","ban_player","reset_player",
+            "set_live_value","force_crisis","force_opportunity","force_seasonal",
+            "broadcast_news","teleport_player","reload_config","view_all_profiles",
+            "toggle_crises","set_income_mult",
+        },
+        moderator = {"view_profile","kick_player","force_crisis","broadcast_news"},
+        tester    = {"view_profile","give_cash","force_seasonal","set_live_value"},
+    },
+
+    chatCommands = {
+        ["/givecash"]     = "give_cash",     ["/viewprofile"]  = "view_profile",
+        ["/kick"]         = "kick_player",   ["/ban"]          = "ban_player",
+        ["/resetplayer"]  = "reset_player",  ["/setlive"]      = "set_live_value",
+        ["/crisis"]       = "force_crisis",  ["/opportunity"]  = "force_opportunity",
+        ["/seasonal"]     = "force_seasonal",["/news"]         = "broadcast_news",
+        ["/reloadconfig"] = "reload_config", ["/togglecrises"] = "toggle_crises",
+        ["/incomemult"]   = "set_income_mult",
+    },
+
+    banList = {
+        -- add UserId numbers here to prevent them joining: 1111111111,
+    },
+
+    logAdminActions   = true,
+    adminPanelEnabled = true,
+}
+```
+
+---
+
+## 22.18 AdminService — Complete Implementation
+
+```
+Path: ServerScriptService/Services/AdminService (Script)
+```
+
+```lua
+-- ServerScriptService/Services/AdminService.lua
+local DataStoreService  = game:GetService("DataStoreService")
+local MessagingService  = game:GetService("MessagingService")
+local Players            = game:GetService("Players")
+local ReplicatedStorage  = game:GetService("ReplicatedStorage")
+
+local GameRegistry  = require(script.Parent.Parent:WaitForChild("GameRegistry"))
+local PlayerService = require(script.Parent.PlayerService)
+
+local AdminConfig = GameRegistry.Admin
+local Balance     = GameRegistry.Balance
+
+local LiveConfigStore = DataStoreService:GetDataStore("MogulInc_LiveConfig_v1")
+local BanStore         = DataStoreService:GetDataStore("MogulInc_Bans_v1")
+local AdminLogStore    = DataStoreService:GetDataStore("MogulInc_AdminLog_v1")
+
+local AdminService = {}
+
+local function hasPermission(adminUserId, permission)
+    local role = AdminConfig.admins[adminUserId]
+    if not role then return false end
+    local perms = AdminConfig.permissions[role]
+    if not perms then return false end
+    for _, p in ipairs(perms) do if p == permission then return true end end
+    return false
+end
+
+local function logAction(adminId, action, details)
+    if not AdminConfig.logAdminActions then return end
+    print(string.format("[ADMIN] UserId=%d Action=%s Details=%s", adminId, action, tostring(details)))
+    local logKey = "log_"..adminId.."_"..os.time()
+    pcall(function()
+        AdminLogStore:SetAsync(logKey, {adminId=adminId, action=action, details=details, time=os.time()})
+    end)
+end
+
+-- ============================================================
+-- PLAYER TOOLS
+-- ============================================================
+function AdminService.giveCash(adminId, targetUserId, amount)
+    if not hasPermission(adminId, "give_cash") then return false, "No permission" end
+    local profile = PlayerService.getProfile(targetUserId)
+    if not profile then return false, "Player not found in server" end
+    profile.economy.cash += amount
+    logAction(adminId, "give_cash", "target="..targetUserId.." amount="..amount)
+    local player = Players:GetPlayerByUserId(targetUserId)
+    if player then
+        ReplicatedStorage.Remotes.Events.SyncEconomy:FireClient(player, {
+            cash=profile.economy.cash, incomePerHour=profile.economy.incomePerHour,
+            netWorth=PlayerService.calculateNetWorth(profile), boostActive=profile.economy.boostActive,
+        })
+    end
+    return true, "Gave $"..amount.." to "..targetUserId
+end
+
+function AdminService.viewProfile(adminId, targetUserId)
+    if not hasPermission(adminId, "view_profile") then return false, "No permission" end
+    local profile = PlayerService.getProfile(targetUserId)
+    if not profile then return false, "Player not found in server" end
+    logAction(adminId, "view_profile", "target="..targetUserId)
+    return true, {
+        cash=profile.economy.cash, incomePerHour=profile.economy.incomePerHour,
+        totalRevenue=profile.economy.totalRevenue, branchCount=#profile.branches,
+        staffCount=#profile.staff, brandScore=profile.brand.score,
+        ipoCount=profile.season.ipoCount, legacyMult=profile.season.legacyMultiplier,
+        industry=profile.company.industry,
+    }
+end
+
+function AdminService.kickPlayer(adminId, targetUserId, reason)
+    if not hasPermission(adminId, "kick_player") then return false, "No permission" end
+    local player = Players:GetPlayerByUserId(targetUserId)
+    if not player then return false, "Player not in this server" end
+    logAction(adminId, "kick_player", "target="..targetUserId.." reason="..tostring(reason))
+    player:Kick(reason or "Removed by admin.")
+    return true, "Kicked "..targetUserId
+end
+
+function AdminService.banPlayer(adminId, targetUserId, reason)
+    if not hasPermission(adminId, "ban_player") then return false, "No permission" end
+    logAction(adminId, "ban_player", "target="..targetUserId)
+    pcall(function()
+        BanStore:SetAsync("ban_"..targetUserId, {banned=true, reason=reason or "Banned by admin.", time=os.time()})
+    end)
+    local player = Players:GetPlayerByUserId(targetUserId)
+    if player then player:Kick("You have been banned: "..(reason or "")) end
+    return true, "Banned "..targetUserId
+end
+
+function AdminService.isPlayerBanned(userId)
+    local ok, data = pcall(function() return BanStore:GetAsync("ban_"..userId) end)
+    if ok and data and data.banned then return true, data.reason end
+    return false, nil
+end
+
+function AdminService.resetPlayerData(adminId, targetUserId)
+    if not hasPermission(adminId, "reset_player") then return false, "No permission" end
+    local player = Players:GetPlayerByUserId(targetUserId)
+    if player then return false, "Player must be offline to reset data." end
+    logAction(adminId, "reset_player", "target="..targetUserId)
+    local ProfileStore   = require(game.ServerScriptService.ProfileStore)
+    local DefaultProfile = require(ReplicatedStorage.DefaultProfile)
+    local GameProfiles   = ProfileStore.GetProfileStore("MogulInc_v1", DefaultProfile)
+    local profile = GameProfiles:LoadProfileAsync("Player_"..targetUserId)
+    if profile then
+        for key, value in pairs(DefaultProfile) do profile.Data[key] = value end
+        profile:Release()
+        return true, "Reset data for "..targetUserId
+    end
+    return false, "Could not load profile for reset"
+end
+
+-- ============================================================
+-- LIVE CONFIG OVERRIDES
+-- ============================================================
+function AdminService.setLiveValue(adminId, key, value)
+    if not hasPermission(adminId, "set_live_value") then return false, "No permission" end
+    if Balance[key] == nil then return false, "Key '"..key.."' not found in BalanceConfig" end
+    if type(value) ~= type(Balance[key]) then
+        return false, "Type mismatch: expected "..type(Balance[key]).." got "..type(value)
+    end
+    logAction(adminId, "set_live_value", "key="..key.." value="..tostring(value))
+    pcall(function()
+        LiveConfigStore:SetAsync("live_"..key, {value=value, setAt=os.time(), setBy=adminId})
+    end)
+    GameRegistry.LiveOverrides[key] = value
+    pcall(function() MessagingService:PublishAsync("AdminLiveConfig", {key=key, value=value}) end)
+    return true, "Set "..key.." = "..tostring(value).." (live, all servers)"
+end
+
+function AdminService.getLiveValue(key)
+    return GameRegistry.LiveOverrides[key] or Balance[key]
+end
+
+function AdminService.resetLiveValue(adminId, key)
+    if not hasPermission(adminId, "set_live_value") then return false, "No permission" end
+    logAction(adminId, "reset_live_value", "key="..key)
+    GameRegistry.LiveOverrides[key] = nil
+    pcall(function() LiveConfigStore:RemoveAsync("live_"..key) end)
+    pcall(function() MessagingService:PublishAsync("AdminLiveConfig", {key=key, value=nil, reset=true}) end)
+    return true, "Reset "..key.." to BalanceConfig default"
+end
+
+pcall(function()
+    MessagingService:SubscribeAsync("AdminLiveConfig", function(message)
+        local data = message.Data
+        if data.reset then GameRegistry.LiveOverrides[data.key] = nil
+        else GameRegistry.LiveOverrides[data.key] = data.value end
+        print("[AdminService] Live config updated: "..data.key.." = "..tostring(data.value))
+    end)
+end)
+
+local function loadLiveOverrides()
+    local overrideKeys = {
+        "INCOME_TICK_RATE","CRISIS_MIN_INTERVAL","CRISIS_MAX_INTERVAL",
+        "OPPORTUNITY_MIN_INTERVAL","SEASON_DURATION_DAYS","global_income_mult","crises_enabled",
+    }
+    for _, key in ipairs(overrideKeys) do
+        local ok, data = pcall(function() return LiveConfigStore:GetAsync("live_"..key) end)
+        if ok and data then
+            GameRegistry.LiveOverrides[key] = data.value
+            print("[AdminService] Loaded live override: "..key.." = "..tostring(data.value))
+        end
+    end
+end
+loadLiveOverrides()
+
+-- ============================================================
+-- EVENT TOOLS
+-- ============================================================
+function AdminService.forceCrisis(adminId, targetUserId, crisisId, severity)
+    if not hasPermission(adminId, "force_crisis") then return false, "No permission" end
+    if not GameRegistry.Crises[crisisId] then return false, "Unknown crisis: "..crisisId end
+    severity = severity or "mild"
+    logAction(adminId, "force_crisis", "target="..targetUserId.." crisis="..crisisId.." severity="..severity)
+    local EventService = require(script.Parent.EventService)
+    EventService.triggerCrisis(targetUserId, crisisId, severity)
+    return true, "Triggered "..crisisId.." ("..severity..") on "..targetUserId
+end
+
+function AdminService.forceOpportunity(adminId, targetUserId, opportunityId)
+    if not hasPermission(adminId, "force_opportunity") then return false, "No permission" end
+    if not GameRegistry.Opportunities[opportunityId] then return false, "Unknown opportunity: "..opportunityId end
+    logAction(adminId, "force_opportunity", "target="..targetUserId.." opp="..opportunityId)
+    local EventService = require(script.Parent.EventService)
+    EventService.triggerOpportunity(targetUserId, opportunityId)
+    return true, "Triggered "..opportunityId.." on "..targetUserId
+end
+
+function AdminService.forceSeasonal(adminId, seasonalId)
+    if not hasPermission(adminId, "force_seasonal") then return false, "No permission" end
+    if not GameRegistry.Seasonal[seasonalId] then return false, "Unknown seasonal event: "..seasonalId end
+    logAction(adminId, "force_seasonal", "event="..seasonalId)
+    local EventService = require(script.Parent.EventService)
+    EventService.startSeasonalEvent(seasonalId)
+    pcall(function() MessagingService:PublishAsync("AdminForceSeasonal", {seasonalId=seasonalId}) end)
+    return true, "Started seasonal event: "..seasonalId
+end
+
+function AdminService.broadcastNews(adminId, message, priority)
+    if not hasPermission(adminId, "broadcast_news") then return false, "No permission" end
+    priority = priority or "normal"
+    logAction(adminId, "broadcast_news", "message="..message)
+    for _, player in ipairs(Players:GetPlayers()) do
+        ReplicatedStorage.Remotes.Events.PushNewsItem:FireClient(player, {message="[ADMIN] "..message, priority=priority})
+    end
+    pcall(function() MessagingService:PublishAsync("AdminBroadcastNews", {message=message, priority=priority}) end)
+    return true, "Broadcast sent to all servers"
+end
+
+-- ============================================================
+-- GLOBAL TOGGLES
+-- ============================================================
+function AdminService.toggleCrises(adminId, enabled)
+    if not hasPermission(adminId, "toggle_crises") then return false, "No permission" end
+    return AdminService.setLiveValue(adminId, "crises_enabled", enabled)
+end
+
+function AdminService.setGlobalIncomeMult(adminId, multiplier)
+    if not hasPermission(adminId, "set_income_mult") then return false, "No permission" end
+    if multiplier < 0.1 or multiplier > 100 then return false, "Multiplier must be between 0.1 and 100" end
+    return AdminService.setLiveValue(adminId, "global_income_mult", multiplier)
+end
+
+-- ============================================================
+-- REMOTEFUNCTION FOR ADMIN PANEL UI
+-- ============================================================
+local AdminRemote = Instance.new("RemoteFunction")
+AdminRemote.Name = "AdminCommand"
+AdminRemote.Parent = ReplicatedStorage.Remotes.Functions
+
+AdminRemote.OnServerInvoke = function(player, command, ...)
+    local adminId = player.UserId
+    local args = {...}
+    if command == "give_cash"         then return AdminService.giveCash(adminId, args[1], args[2]) end
+    if command == "view_profile"      then return AdminService.viewProfile(adminId, args[1]) end
+    if command == "kick_player"       then return AdminService.kickPlayer(adminId, args[1], args[2]) end
+    if command == "ban_player"        then return AdminService.banPlayer(adminId, args[1], args[2]) end
+    if command == "reset_player"      then return AdminService.resetPlayerData(adminId, args[1]) end
+    if command == "set_live_value"    then return AdminService.setLiveValue(adminId, args[1], args[2]) end
+    if command == "get_live_value"    then return true, AdminService.getLiveValue(args[1]) end
+    if command == "reset_live_value"  then return AdminService.resetLiveValue(adminId, args[1]) end
+    if command == "force_crisis"      then return AdminService.forceCrisis(adminId, args[1], args[2], args[3]) end
+    if command == "force_opportunity" then return AdminService.forceOpportunity(adminId, args[1], args[2]) end
+    if command == "force_seasonal"    then return AdminService.forceSeasonal(adminId, args[1]) end
+    if command == "broadcast_news"    then return AdminService.broadcastNews(adminId, args[1], args[2]) end
+    if command == "toggle_crises"     then return AdminService.toggleCrises(adminId, args[1]) end
+    if command == "set_income_mult"   then return AdminService.setGlobalIncomeMult(adminId, args[1]) end
+    return false, "Unknown command: "..tostring(command)
+end
+
+-- ============================================================
+-- BAN CHECK ON JOIN — call from PlayerService before profile load
+-- ============================================================
+function AdminService.checkBanOnJoin(player)
+    local banned, reason = AdminService.isPlayerBanned(player.UserId)
+    if banned then
+        player:Kick("You are banned from this game. Reason: "..(reason or ""))
+        return true
+    end
+    return false
+end
+
+return AdminService
+```
+
+---
+
+## 22.19 Admin Panel UI (LocalScript)
+
+```
+Path: StarterPlayerScripts/AdminPanel (LocalScript)
+Only renders for players whose UserId is in AdminConfig.admins.
+Toggle with Right Shift + A.
+```
+
+```lua
+-- StarterPlayerScripts/AdminPanel.lua
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService  = game:GetService("UserInputService")
+
+local AdminRemote  = ReplicatedStorage.Remotes.Functions:WaitForChild("AdminCommand")
+local localPlayer  = Players.LocalPlayer
+
+-- Verify admin status via a safe server call
+local isAdmin = false
+local ok, result = pcall(function() return AdminRemote:InvokeServer("view_profile", localPlayer.UserId) end)
+if ok and result then isAdmin = true end
+if not isAdmin then return end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdminPanel"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = localPlayer.PlayerGui
+
+local Panel = Instance.new("Frame")
+Panel.Name = "AdminPanel"
+Panel.Size = UDim2.new(0, 400, 0, 550)
+Panel.Position = UDim2.new(0, 20, 0.5, -275)
+Panel.BackgroundColor3 = Color3.fromHex("#0A0A12")
+Panel.BorderSizePixel = 0
+Panel.Visible = false
+Panel.ZIndex = 100
+Panel.Parent = ScreenGui
+
+local PanelCorner = Instance.new("UICorner"); PanelCorner.CornerRadius = UDim.new(0,10); PanelCorner.Parent = Panel
+local PanelStroke = Instance.new("UIStroke"); PanelStroke.Color = Color3.fromHex("#EF4444"); PanelStroke.Thickness = 2; PanelStroke.Parent = Panel
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1,0,0,40)
+TitleBar.BackgroundColor3 = Color3.fromHex("#EF4444")
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = Panel
+local TitleCorner = Instance.new("UICorner"); TitleCorner.CornerRadius = UDim.new(0,10); TitleCorner.Parent = TitleBar
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1,-40,1,0)
+TitleLabel.Position = UDim2.new(0,12,0,0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "ADMIN PANEL"
+TitleLabel.TextColor3 = Color3.new(1,1,1)
+TitleLabel.TextSize = 14
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1,-16,1,-56)
+Scroll.Position = UDim2.new(0,8,0,48)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 4
+Scroll.ScrollBarImageColor3 = Color3.fromHex("#EF4444")
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.CanvasSize = UDim2.new(0,0,0,0)
+Scroll.Parent = Panel
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0,6)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Parent = Scroll
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingBottom = UDim.new(0,8)
+Padding.Parent = Scroll
+
+local function makeHeader(text)
+    local h = Instance.new("TextLabel")
+    h.Size = UDim2.new(1,0,0,22)
+    h.BackgroundColor3 = Color3.fromHex("#1A1A2A")
+    h.BorderSizePixel = 0
+    h.Text = "  "..text
+    h.TextColor3 = Color3.fromHex("#EF4444")
+    h.TextSize = 11
+    h.Font = Enum.Font.GothamBold
+    h.TextXAlignment = Enum.TextXAlignment.Left
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,4); c.Parent = h
+    h.Parent = Scroll
+    return h
+end
+
+local function makeInputRow(labelText, buttonText, buttonColor, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,36)
+    row.BackgroundTransparency = 1
+    row.Parent = Scroll
+
+    local rowLayout = Instance.new("UIListLayout")
+    rowLayout.FillDirection = Enum.FillDirection.Horizontal
+    rowLayout.Padding = UDim.new(0,4)
+    rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    rowLayout.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0,110,1,0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromHex("#8A8A9A")
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(0,140,0,28)
+    input.BackgroundColor3 = Color3.fromHex("#1A1A24")
+    input.BorderSizePixel = 0
+    input.PlaceholderText = "value..."
+    input.TextColor3 = Color3.new(1,1,1)
+    input.PlaceholderColor3 = Color3.fromHex("#4A4A60")
+    input.TextSize = 11
+    input.Font = Enum.Font.RobotoMono
+    local ic = Instance.new("UICorner"); ic.CornerRadius = UDim.new(0,4); ic.Parent = input
+    local is = Instance.new("UIStroke"); is.Color = Color3.fromHex("#FFFFFF"); is.Transparency = 0.90; is.Thickness = 1; is.Parent = input
+    input.Parent = row
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,70,0,28)
+    btn.BackgroundColor3 = buttonColor or Color3.fromHex("#22C55E")
+    btn.BorderSizePixel = 0
+    btn.Text = buttonText
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.GothamSemibold
+    local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0,4); bc.Parent = btn
+    btn.Parent = row
+
+    btn.Activated:Connect(function()
+        local val = input.Text
+        if val == "" then return end
+        local success, msgResult = callback(val)
+        btn.BackgroundColor3 = success and Color3.fromHex("#22C55E") or Color3.fromHex("#EF4444")
+        task.delay(1.5, function() btn.BackgroundColor3 = buttonColor or Color3.fromHex("#22C55E") end)
+        print("[AdminPanel] "..(success and "OK" or "FAIL")..": "..tostring(msgResult))
+    end)
+
+    return row
+end
+
+local function makeActionRow(labelText, buttonText, buttonColor, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,32)
+    row.BackgroundTransparency = 1
+    row.Parent = Scroll
+
+    local rowLayout = Instance.new("UIListLayout")
+    rowLayout.FillDirection = Enum.FillDirection.Horizontal
+    rowLayout.Padding = UDim.new(0,4)
+    rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    rowLayout.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1,-90,1,0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromHex("#8A8A9A")
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,85,0,26)
+    btn.BackgroundColor3 = buttonColor or Color3.fromHex("#3B82F6")
+    btn.BorderSizePixel = 0
+    btn.Text = buttonText
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.GothamSemibold
+    local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0,4); bc.Parent = btn
+    btn.Parent = row
+
+    btn.Activated:Connect(function()
+        local success, msgResult = callback()
+        btn.BackgroundColor3 = success and Color3.fromHex("#22C55E") or Color3.fromHex("#EF4444")
+        task.delay(1.5, function() btn.BackgroundColor3 = buttonColor or Color3.fromHex("#3B82F6") end)
+        print("[AdminPanel] "..(success and "OK" or "FAIL")..": "..tostring(msgResult))
+    end)
+
+    return row
+end
+
+local targetInput
+do
+    makeHeader("TARGET PLAYER")
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1,0,0,36)
+    row.BackgroundTransparency = 1
+    row.Parent = Scroll
+    local rl = Instance.new("UIListLayout"); rl.FillDirection=Enum.FillDirection.Horizontal; rl.Padding=UDim.new(0,4); rl.VerticalAlignment=Enum.VerticalAlignment.Center; rl.Parent=row
+    local lbl = Instance.new("TextLabel"); lbl.Size=UDim2.new(0,110,1,0); lbl.BackgroundTransparency=1; lbl.Text="Target UserId:"; lbl.TextColor3=Color3.fromHex("#8A8A9A"); lbl.TextSize=11; lbl.Font=Enum.Font.GothamMedium; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.Parent=row
+    targetInput = Instance.new("TextBox")
+    targetInput.Size=UDim2.new(0,220,0,28)
+    targetInput.BackgroundColor3=Color3.fromHex("#1A1A24")
+    targetInput.BorderSizePixel=0
+    targetInput.PlaceholderText="Enter UserId here..."
+    targetInput.TextColor3=Color3.new(1,1,1)
+    targetInput.PlaceholderColor3=Color3.fromHex("#4A4A60")
+    targetInput.TextSize=11
+    targetInput.Font=Enum.Font.RobotoMono
+    local tc=Instance.new("UICorner"); tc.CornerRadius=UDim.new(0,4); tc.Parent=targetInput
+    local ts=Instance.new("UIStroke"); ts.Color=Color3.fromHex("#FFFFFF"); ts.Transparency=0.82; ts.Thickness=1; ts.Parent=targetInput
+    targetInput.Parent=row
+end
+
+makeHeader("ECONOMY")
+makeInputRow("Give Cash $:", "Give", Color3.fromHex("#22C55E"), function(val)
+    local amount = tonumber(val)
+    if not amount then return false, "Invalid amount" end
+    local targetId = tonumber(targetInput.Text)
+    if not targetId then return false, "Set a target UserId first" end
+    return AdminRemote:InvokeServer("give_cash", targetId, amount)
+end)
+
+makeInputRow("Income Mult:", "Set", Color3.fromHex("#F59E0B"), function(val)
+    local mult = tonumber(val)
+    if not mult then return false, "Invalid multiplier" end
+    return AdminRemote:InvokeServer("set_income_mult", mult)
+end)
+
+makeHeader("EVENTS")
+makeInputRow("Crisis ID:", "Fire", Color3.fromHex("#EF4444"), function(val)
+    local targetId = tonumber(targetInput.Text)
+    if not targetId then return false, "Set a target UserId first" end
+    return AdminRemote:InvokeServer("force_crisis", targetId, val, "severe")
+end)
+
+makeInputRow("Opportunity ID:", "Fire", Color3.fromHex("#22C55E"), function(val)
+    local targetId = tonumber(targetInput.Text)
+    if not targetId then return false, "Set a target UserId first" end
+    return AdminRemote:InvokeServer("force_opportunity", targetId, val)
+end)
+
+makeInputRow("Seasonal ID:", "Start", Color3.fromHex("#A855F7"), function(val)
+    return AdminRemote:InvokeServer("force_seasonal", val)
+end)
+
+makeHeader("📢 BROADCAST")
+makeInputRow("News Message:", "Send", Color3.fromHex("#F59E0B"), function(val)
+    return AdminRemote:InvokeServer("broadcast_news", val, "breaking")
+end)
+
+makeHeader("⚙️ LIVE CONFIG")
+makeInputRow("BalanceConfig Key:", "Get", Color3.fromHex("#3B82F6"), function(val)
+    local ok, result = AdminRemote:InvokeServer("get_live_value", val)
+    return ok, tostring(result)
+end)
+
+makeInputRow("Key = Value:", "Set", Color3.fromHex("#F59E0B"), function(val)
+    -- format: "KEY_NAME=123"
+    local key, rawVal = val:match("^(.-)=(.+)$")
+    if not key then return false, "Format: KEY_NAME=value" end
+    local numVal = tonumber(rawVal)
+    local finalVal = numVal ~= nil and numVal or (rawVal == "true" and true or (rawVal == "false" and false or rawVal))
+    return AdminRemote:InvokeServer("set_live_value", key, finalVal)
+end)
+
+makeInputRow("Key to reset:", "Reset", Color3.fromHex("#EF4444"), function(val)
+    return AdminRemote:InvokeServer("reset_live_value", val)
+end)
+
+makeHeader("👤 PLAYER TOOLS")
+makeActionRow("View target profile data", "View", Color3.fromHex("#3B82F6"), function()
+    local targetId = tonumber(targetInput.Text)
+    if not targetId then return false, "Set a target UserId first" end
+    local ok, data = AdminRemote:InvokeServer("view_profile", targetId)
+    if ok and data then
+        local summary = string.format(
+            "Cash:$%s | Inc/hr:$%s | Revenue:$%s | Branches:%d | Brand:%d | IPOs:%d | Industry:%s",
+            tostring(math.floor(data.cash)),
+            tostring(math.floor(data.incomePerHour)),
+            tostring(math.floor(data.totalRevenue)),
+            data.branchCount,
+            data.brandScore,
+            data.ipoCount,
+            tostring(data.industry)
+        )
+        return true, summary
+    end
+    return false, "Could not load profile"
+end)
+
+makeInputRow("Kick Reason:", "Kick", Color3.fromHex("#EF4444"), function(val)
+    local targetId = tonumber(targetInput.Text)
+    if not targetId then return false, "Set a target UserId first" end
+    return AdminRemote:InvokeServer("kick_player", targetId, val)
+end)
+
+makeInputRow("Ban Reason:", "Ban", Color3.fromHex("#7C0000"), function(val)
+    local targetId = tonumber(targetInput.Text)
+    if not targetId then return false, "Set a target UserId first" end
+    -- Confirm ban with double-check
+    return AdminRemote:InvokeServer("ban_player", targetId, val)
+end)
+
+makeHeader("🔴 DANGER ZONE")
+makeActionRow("Toggle crises OFF globally", "Disable", Color3.fromHex("#EF4444"), function()
+    return AdminRemote:InvokeServer("toggle_crises", false)
+end)
+makeActionRow("Toggle crises ON globally", "Enable", Color3.fromHex("#22C55E"), function()
+    return AdminRemote:InvokeServer("toggle_crises", true)
+end)
+
+-- ============================================================
+-- TOGGLE PANEL WITH RIGHT SHIFT + A
+-- ============================================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        -- start tracking shift held
+    end
+    if input.KeyCode == Enum.KeyCode.A and UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+        Panel.Visible = not Panel.Visible
+    end
+end)
+
+print("[AdminPanel] Loaded for admin " .. localPlayer.UserId)
+```
+
+---
+
+## 22.20 How to Add Content — Step-by-Step Reference
+
+This section is a quick-reference guide. Every addition follows the same pattern:
+edit a Config file, never touch a Service.
+
+---
+
+### Adding a New Industry
+
+```
+STEP 1: IndustryConfig.lua
+  — Copy any existing industry block (e.g. fast_food)
+  — Change the key to your new industry ID (e.g. "bakery")
+  — Fill in: displayName, themeColor, branchName, staffTitle, productName, hqName
+  — Set validSlots (which city types work for this industry)
+  — Write 5 names per upgradeNames path (volume, premium, seasonal)
+  — Set crisisPool: list 10 crisis IDs (must exist in CrisisConfig)
+  — Set exclusiveRD: list up to 4 R&D project IDs (must exist in ResearchConfig)
+  — Set mechanics: copy from fast_food and change any special values
+
+STEP 2: CrisisConfig.lua (if any new crises)
+  — Add 10 crisis blocks with your new industry ID
+  — Each needs: displayName, industry, newsText, mild{}, severe{}
+
+STEP 3: ResearchConfig.lua (if any exclusive R&D)
+  — Add up to 4 project blocks with availableFor = {"bakery"}
+  — Each needs: displayName, category, cost, baseDuration, effectType, effectValue
+
+STEP 4: IconConfig.lua
+  — Upload a white-on-transparent PNG icon to Roblox
+  — Add: Industry = { ..., Bakery = 12345678 }  -- your asset ID
+
+STEP 5: GameRegistry.validate() runs automatically on server start
+  — It checks all 10 crisisPool IDs exist in CrisisConfig
+  — It checks all exclusiveRD IDs exist in ResearchConfig
+  — It checks upgradeNames has exactly 5 entries per path
+  — Fix any errors it warns about in the output
+
+STEP 6: Nothing else. The game reads IndustryConfig automatically:
+  — BranchService reads branchName for UI labels
+  — EventService draws from crisisPool for crisis events
+  — ResearchService filters projects by availableFor
+  — IncomeService applies mechanics.seasonalEventMult
+  — Client UI reads themeColor for tab and card accents
+```
+
+---
+
+### Adding a New Country
+
+```
+STEP 1: CountryConfig.lua
+  — Copy any existing country block of the same target tier
+  — Change the key (e.g. "ireland") — must be lowercase, no spaces
+  — Set: displayName, tier, unlockRevenue, unlockCost, wealthMult
+  — Set demand: fill in a value (0.5-2.0) for all 15 industry IDs
+    (missing industry = defaults to 1.0 in CountryService.getDemand)
+  — Set cities: list 3-7 cities, each with unique id, name, slotType
+    (slotType must match a key in CityConfig)
+  — Set flagAssetId: upload flag image to Roblox, paste asset ID
+  — OPTIONAL: set specialBonus for a unique city bonus
+
+STEP 2: Nothing else.
+  — World map: country node appears at approximate geographic position
+    (position is set in WorldMapClient based on a lookup table by country key —
+     add an entry there: countryPositions["ireland"] = Vector2.new(x, y))
+  — Leaderboard: country stats auto-calculate
+  — EventService: crisis flavor uses crisisFlavorTags for news text variety
+```
+
+---
+
+### Adding a New Board Decision
+
+```
+STEP 1: BoardConfig.lua
+  — Add one new block to the decisions array
+  — Give it a unique id string (e.g. "partnership_grant")
+  — Set category: expansion / hr / financial / brand / operations / competitive
+  — Write title, text, and 2-3 options (each with label, shortLabel, effect)
+  — The "effect" string is the key BoardService looks up
+
+STEP 2: BoardService.lua (one addition to the Effects table)
+  — Add: BoardEffects["partnership_grant"] = {
+      [1] = function(profile) profile.economy.cash += 50000 end,
+      [2] = function(profile) profile.brand.score += 5 end,
+      [3] = function(profile) end,   -- no change option
+    }
+
+STEP 3: Nothing else.
+  — BoardService draws randomly from the decisions array each day
+  — Your new decision is automatically included in the pool
+  — Total pool size is unlimited — add as many as you want
+```
+
+---
+
+### Adding a New R&D Project
+
+```
+STEP 1: ResearchConfig.lua
+  — Add one new block with a unique key (e.g. "loyalty_rewards_program")
+  — Set: displayName, category, availableFor, cost, baseDuration
+  — Set effectType to an existing handler OR a new one
+  — Set effectValue, permanent, oncePer
+
+STEP 2: ResearchService.lua (only if new effectType)
+  — Add to the Effects table:
+    ResearchEffects["loyalty_rewards_program"] = function(profile, project)
+        profile.economy.incomePerHour *= (1 + project.effectValue)
+        profile.research.bonuses["loyalty_rewards_program"] = true
+    end
+
+STEP 3: If industry-exclusive: add the project ID to IndustryConfig.exclusiveRD
+  for the relevant industry
+
+STEP 4: Nothing else.
+  — ResearchService filters available projects by availableFor automatically
+  — CTO speed bonuses apply automatically (based on baseDuration)
+  — The R&D tab client reads ResearchConfig directly
+```
+
+---
+
+### Adding a New Staff Specialty
+
+```
+STEP 1: StaffConfig.lua
+  — Add one block to the specialties table
+  — Set: displayName, description, dropWeight, unlockRevenue
+  — Set bonuses as arrays of [L1, L2, L3, L4] values
+  — If path-restricted: set pathRestriction = "volume" (or "premium"/"seasonal")
+
+STEP 2: StaffService.lua (ApplySpecialtyBonus function)
+  — Add a case for your new specialty:
+    elseif specialtyId == "your_specialty" then
+        local bonus = specialty.bonuses.yourBonusField[staffLevel]
+        profile.economy.incomePerHour *= (1 + bonus)
+
+STEP 3: Nothing else.
+  — Hire system draws from specialties table weighted by dropWeight
+  — Client Staff UI reads displayName and description automatically
+  — Promotion multipliers apply automatically from promotionLevels
+```
+
+---
+
+### Adding a New Executive Role (if ever expanding beyond 4)
+
+```
+STEP 1: ExecConfig.lua
+  — Add a new key block (e.g. "cso" for Chief Strategy Officer)
+  — Define 3 tiers with cost and all bonus fields
+  — Set unlockRevenue if the role should unlock late
+
+STEP 2: ExecService.lua
+  — Add handling in ApplyExecBonuses() for the new role key
+  — Add an exec slot reference in IncomeService.Recalculate()
+
+STEP 3: DefaultProfile.lua
+  — Add the new slot: executives = { coo=nil, cmo=nil, cfo=nil, cto=nil, cso=nil }
+
+STEP 4: Client ExecsUI
+  — The exec tab reads ExecConfig to build cards — add the new key to the
+    ordered display list in ExecsClient: local execOrder = {"coo","cmo","cfo","cto","cso"}
+```
+
+---
+
+### Adding a New Crisis Type
+
+```
+STEP 1: CrisisConfig.lua
+  — Add one block with a unique key
+  — Set: displayName, industry (or "universal"), newsText
+  — Set mild{} and severe{} with any combination of:
+    incomePenalty, brandPenalty, cashFine, moraleHit, staffQuit,
+    branchOfflineMinutes, branchClosedHours, demandPenalty,
+    overheadIncrease, forcesBoard, escalationTarget
+
+STEP 2: Add the crisis ID to an industry's crisisPool in IndustryConfig
+  (replace one of the 10 existing entries, or expand the pool if you want
+   industries to draw from a larger pool — EventService.pickCrisis() randomly
+   samples from the crisisPool array)
+
+STEP 3: Nothing else. EventService reads the crisis definition and applies
+  all the fields automatically.
+```
+
+---
+
+### Adding a New Seasonal Event
+
+```
+STEP 1: SeasonalConfig.lua
+  — Add one block with a unique key
+  — Set: displayName, month, day (nil = random date in month), durationHours
+  — Set multipliers for all 15 industry IDs (missing = defaults to 1.0)
+  — Write a newsAnnouncement string
+
+STEP 2: Nothing else.
+  — SeasonService checks SeasonalConfig each day for scheduled events
+  — EventService fires the event and applies multipliers to all Seasonal
+    path branches automatically
+  — News ticker gets the announcement automatically
+```
+
+---
+
+### Adding a New Opportunity Event
+
+```
+STEP 1: OpportunityConfig.lua
+  — Add one block with a unique key
+  — Set: displayName, newsText, effect{}
+  — The effect table is read by EventService.applyOpportunity()
+
+STEP 2: EventService.lua (applyOpportunity function)
+  — Add a case for your new opportunity if the effect fields are new:
+    elseif effect.yourNewField then
+        -- apply the new effect
+    end
+  — If your effect uses existing fields (cashBonus, brandGain, incomeBoostFraction etc.)
+    no code change is needed at all
+```
+
+---
+
+### Adding a New Investor Contract Type
+
+```
+STEP 1: ContractConfig.lua (not shown above — same structure as the others)
+  — Add one block to the contracts array
+  — Set: displayName, requirementType, requirementValue, rewardCash, rewardBrand,
+         rewardOther (optional)
+
+STEP 2: ContractService.lua
+  — Add evaluation logic in ContractService.evaluateContract(profile, contract):
+    elseif contract.requirementType == "your_new_type" then
+        return getYourMetric(profile) >= contract.requirementValue
+
+STEP 3: Nothing else.
+  — ContractService generates contracts by randomly drawing from ContractConfig
+  — New type is automatically in the pool
+```
+
+---
+
+### Running a Live Event (Admin workflow — no code needed)
+
+```
+TRIGGER A SEASONAL EVENT ON ALL SERVERS:
+  Admin Panel → Seasonal ID → Type "holiday_rush" → Click Start
+  Or via AdminService chat: /seasonal holiday_rush
+
+DOUBLE ALL INCOME FOR 2 HOURS (special event):
+  Admin Panel → Live Config → Key = Value → "global_income_mult=2" → Set
+  Undo: Key to reset → "global_income_mult" → Reset
+
+DISABLE CRISES FOR MAINTENANCE:
+  Admin Panel → Toggle crises OFF
+  Re-enable: Toggle crises ON
+
+PUSH A SERVER ANNOUNCEMENT:
+  Admin Panel → News Message → Type message → Send (fires as "breaking" news)
+
+GIVE ALL PLAYERS A CASH BONUS:
+  This requires iterating Players in a server Script and calling
+  AdminService.giveCash() per player — add a "give_all_cash" command to
+  AdminService if this is a regular need.
+  MessagingService then broadcasts to all servers.
+
+CHANGE CRISIS FREQUENCY LIVE:
+  Admin Panel → Key = Value → "CRISIS_MIN_INTERVAL=600" → Set
+  (reduces min gap between crises to 10 min — useful for testing)
+  Reset when done: Key to reset → "CRISIS_MIN_INTERVAL"
+```
+
+---
+
+## 22.21 The One Rule
+
+```
+When you want to add or change something, ask:
+  "Is this a WHAT (new content) or a HOW (new mechanic)?"
+
+  WHAT (content) → edit a Config file only.
+                   No service code changes. GameRegistry reads it automatically.
+
+  HOW (mechanic) → edit a Service, then add the supporting config entry.
+                   Services contain logic. Configs contain data. Never mix them.
+
+Examples:
+  "Add a new industry"          → WHAT → IndustryConfig only
+  "Add a new crisis type"       → WHAT → CrisisConfig only
+  "Add a new seasonal event"    → WHAT → SeasonalConfig only
+  "Add a new board decision"    → WHAT → BoardConfig + one Effects function
+  "Add a new R&D project"       → WHAT → ResearchConfig + one Effects function (if new effectType)
+  "Change income formula"       → HOW  → IncomeService.Recalculate()
+  "Add a new staff mechanic"    → HOW  → StaffService + StaffConfig bonus field
+  "Change crisis timing"        → WHAT → BalanceConfig (CRISIS_MIN_INTERVAL)
+  "Add a whole new game system" → HOW  → New Service + new Config file
+                                          Register it in GameRegistry
+                                          Add any content to the Config
+```
+
+---
+
 END OF DOCUMENT
 Mogul Inc. Complete Game Specification — Version 2.0
 Total: 55 countries, 15 industries, 15 staff specialties, 25 R&D projects,
 65 board decisions, 45 crisis types, 20 opportunity types, 12 seasonal events,
 150+ player choices documented.
-All web/HTML terminology replaced with Roblox Luau equivalents.
